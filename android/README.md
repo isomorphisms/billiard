@@ -1,33 +1,63 @@
-# Billiard Android targets and build obligations
+# Billiard: paired Android NativeActivity
 
-Cat Food plans two build-host artifacts for each qualified source commit:
+The same C billiard kernel and rough.framebuffer dotted/alpha drawing stream
+power a DEX-free native app, without Java or Kotlin application logic.
 
-| Selector | Device | ABI | Priority |
+| Cat Food selector | Phone | ABI | Role |
 | --- | --- | --- | --- |
-| phone | MIRO A1 | armeabi-v7a | primary |
-| c67 | MIRO C67 | arm64-v8a | paired/current physical test |
+| phone | MIRO A1 | armeabi-v7a | primary producer |
+| c67 | MIRO C67 | arm64-v8a | paired producer, current physical user test |
 
-The source contract is in [../ci/android-application.tsv](../ci/android-application.tsv).
-With a verified Cat Food host checkout, a release producer starts by running
-`./catfood plan-android-build /path/to/billiard/ci/android-application.tsv phone FULL_SOURCE_SHA`.
-This returns **obligations**, not actual APKs or an executed build.
+See the [Cat Food application contract](../ci/android-application.tsv)
+(`min_sdk=23` for the native in-memory FILE adapters).
 
-## Next implementation stage
+## User interaction
 
-Build a DEX-free Android NativeActivity with a thin NativeWindow/touch adapter:
-dragging the **right wall** changes width; dragging the start dot changes the
-source; angular touch control adjusts direction; play/pause/speed changes the
-geometric distance budget. Pausing does not accumulate wall-clock time.
+Initial point is one-third from the top and centered horizontally. Initial
+direction is 45° up-right. A corner reverses the entering velocity exactly.
+The physics is independent of the rough display.
 
-The platform adapter consumes the same billiard C kernel and the caller-owned
-rough.framebuffer pixels, including the reviewed alpha and patterned-stroke work.
-The wall's mathematical position is never determined by its rough stroke.
+- Drag the right wall horizontally: lengthen/shorten the rectangle.
+- Drag the starting point: change the relative origin.
+- Drag the launch direction handle: change the starting angle.
+- Tap upper left: play/pause. Tap upper right: cycle travel speeds
+  (20, 50, 110 mathematical pixels/second).
+- A paused app does not accumulate elapsed time; the progressive trajectory
+  is measured by geometric distance rather than counting rebounds.
+- Main box is rough but mathematically sharp. The ray is translucent, dotted.
+  Reflected copies and unfolded ray are much fainter.
 
-The existing exact compiler / ICK-versus-NDK capability check must be recorded
-for both target ABIs before any producer stage. NativeActivity packaging must
-use the pinned android-NDK packaging/signing lane and independent ai-ci receipt,
-not a newly generated signing key.
+The app produces a bounded software ARGB framebuffer and copies the result
+into a native RGBA window. The source imports the pinned native
+`rough.framebuffer` implementation rather than bundling an altered copy.
 
-**Status:** geometry host code and tests only. This repository currently does
-not contain or claim a signed APK, qualified crosscompiler stages, C67/A1 device
-installation, physical interaction evidence, or a Cat Food publication receipt.
+## Host compilation
+
+A qualified Linux host with Android NDK `29.0.14206865` and a verified
+checkout of the exact rough.framebuffer dotted/alpha branch at
+`d8ede905ac83c27370a14b92f81b77d6d189d989` can build:
+
+```sh
+make -C android NDK_ROOT="/verified/ndk/29.0.14206865" ANDROID_ABI=armeabi-v7a ANDROID_API=23
+make -C android NDK_ROOT="/verified/ndk/29.0.14206865" ANDROID_ABI=arm64-v8a ANDROID_API=23
+```
+
+The paths are illustrative and require verified host inputs, not Termux
+on a phone. `.github/workflows/billiard-native.yml` runs both real builds
+and records ABI ELF headers, source identity, native symbol/size/hash and
+unstripped vs stripped differences. Cat Food's read-only
+`./catfood plan-android-build` produces A1+C67 obligations on the host,
+but that plan is not a build or a published APK.
+
+## Remaining acceptance
+
+Only an **approved existing** signer, registered package identity and the
+canonical `android-NDK/apk/build-nativeactivity-apk.sh` producer may produce
+installable APK candidates. After that: independent AICI test, emulator
+screenshot movement verification, physical C67 drag/direction/path acceptance,
+and separate A1 physical acceptance.
+
+A host-native `.so` is not an APK and cannot be installed. Current status:
+candidate host/math/drawing sources, no claimed signed APK, publication,
+installation, or physical C67/A1 result. Device builds must not fall back
+to compiling on the handset.
