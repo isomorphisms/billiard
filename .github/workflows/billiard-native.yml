@@ -1,0 +1,85 @@
+name: Billiard native Android A1 and C67 ABIs
+on:
+  push:
+    branches: [feat/rectangle-core]
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - '.github/workflows/billiard-native.yml'
+permissions:
+  contents: read
+jobs:
+  native-abis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact billiard source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout pinned rough framebuffer dotted alpha source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: d8ede905ac83c27370a14b92f81b77d6d189d989
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Resolve Android NDK r29
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - name: Install and identify exact producer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'ndk;29.0.14206865'
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang"
+          test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang"
+          cat "$ndk/source.properties"
+          git rev-parse HEAD
+      - name: Test shared math and pinned rough graphics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make clean test
+          make -C _rough_framebuffer clean test
+      - name: Compile both actual Android native ABIs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=armeabi-v7a ANDROID_API=23
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=arm64-v8a ANDROID_API=23
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          for abi in armeabi-v7a arm64-v8a; do
+            lib="build/android/$abi/libbilliard.so"
+            test -s "$lib"
+            "$readelf" -h "$lib" > "build/android/$abi/elf-header.txt"
+            "$readelf" -d "$lib" > "build/android/$abi/elf-dynamic.txt"
+            "$readelf" -Ws "$lib" > "build/android/$abi/elf-symbols.txt"
+            "$readelf" -lW "$lib" > "build/android/$abi/elf-programs.txt"
+            grep -q 'ANativeActivity_onCreate' "build/android/$abi/elf-symbols.txt"
+            grep -q 'android_main' "build/android/$abi/elf-symbols.txt"
+            grep -q 'libandroid.so' "build/android/$abi/elf-dynamic.txt"
+            sha256sum "$lib" > "build/android/$abi/unstripped.sha256"
+            cp "$lib" "build/android/$abi/libbilliard-stripped.so"
+            "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-debug "build/android/$abi/libbilliard-stripped.so"
+            sha256sum "build/android/$abi/libbilliard-stripped.so" > "build/android/$abi/stripped.sha256"
+            wc -c "$lib" "build/android/$abi/libbilliard-stripped.so"
+          done
+          grep -Eq 'Class: *ELF32' build/android/armeabi-v7a/elf-header.txt
+          grep -Eq 'Machine: *ARM' build/android/armeabi-v7a/elf-header.txt
+          grep -Eq 'Class: *ELF64' build/android/arm64-v8a/elf-header.txt
+          grep -Eq 'Machine: *AArch64' build/android/arm64-v8a/elf-header.txt
+          awk '$1=="LOAD" {count++; if ($NF != "0x4000") exit 1} END {if (count < 1) exit 1}' build/android/arm64-v8a/elf-programs.txt
+      - name: Retain native ABI candidates and inspected headers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-a1-c67-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/armeabi-v7a/*
+            build/android/arm64-v8a/*
+          if-no-files-found: error
