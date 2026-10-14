@@ -1,0 +1,145 @@
+name: Billiard dual-ABI signed test APKs
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - '.github/workflows/billiard-apk.yml'
+  push:
+    branches: [feat/rectangle-core]
+permissions:
+  contents: read
+jobs:
+  signed-native-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout exact billiard candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout pinned rough.framebuffer alpha+dots
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: d8ede905ac83c27370a14b92f81b77d6d189d989
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Checkout canonical Android-NDK packager
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/android-NDK
+          ref: 42f04d7654d54309ec3f8787bfd2bc40730399d7
+          path: _canonical_ndk
+          persist-credentials: false
+      - name: Checkout existing public test keystore
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphismes/wegert
+          ref: 89dcfb840cec1a66ee04c7f7404954cbd6c09839
+          path: _test_signing
+          sparse-checkout: _/build/app/wegert-debug.keystore
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Checkout narrowly registered candidate test identity and verifier
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: f8f7a903ead157600a5736acea3553272292a061
+          path: _aici_test_signing
+          persist-credentials: false
+      - name: Set up exact Android build tools
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - name: Install explicit NDK SDK and APK production inputs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'platforms;android-34' 'build-tools;36.0.0' 'ndk;29.0.14206865'
+          test -x "$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang"
+          command -v keytool
+          command -v unzip
+          command -v zip
+      - name: Validate math and graphics, compile both ABI candidates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make clean test
+          make -C _rough_framebuffer clean test
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          for abi in armeabi-v7a arm64-v8a; do
+            make -C android NDK_ROOT="$ndk" ANDROID_ABI="$abi" ANDROID_API=23
+            lib="build/android/$abi/libbilliard.so"
+            cp "$lib" "build/android/$abi/libbilliard-unstripped.so"
+            "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-debug "$lib"
+            "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -Ws "$lib" | grep -q 'ANativeActivity_onCreate'
+            sha256sum "$lib" "build/android/$abi/libbilliard-unstripped.so"
+            wc -c "$lib" "build/android/$abi/libbilliard-unstripped.so"
+          done
+      - name: Resolve required package-specific certificate from test registry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          registry=_aici_test_signing/android-signing/identities.tsv
+          cert=$(awk -F '\t' '$1=="org.isomorphisms.billiard" && $2=="test" {print $3}' "$registry")
+          [[ "$cert" =~ ^[0-9a-f]{64}$ ]] || { echo "Missing narrowly registered Billiard test signer" >&2; exit 1; }
+          echo "ANDROID_EXPECTED_CERT_SHA256=$cert" >> "$GITHUB_ENV"
+      - name: Package the A1 and C67 APKs via canonical signer-aware packager
+        shell: bash
+        env:
+          ANDROID_PACKAGE_ID: org.isomorphisms.billiard
+          ANDROID_VERSION_CODE: '1'
+          ANDROID_VERSION_NAME: 0.1-test
+          ANDROID_MIN_SDK: '23'
+          ANDROID_TARGET_SDK: '34'
+          ANDROID_EXPECTED_LABEL: Billiard
+          ANDROID_KEYSTORE: ${{ github.workspace }}/_test_signing/_/build/app/wegert-debug.keystore
+          ANDROID_KEYSTORE_TYPE: PKCS12
+          ANDROID_KEY_ALIAS: wegert-debug
+          ANDROID_STORE_PASSWORD: wegert-debug
+          ANDROID_KEY_PASSWORD: wegert-debug
+          ANDROID_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          export ANDROID_BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          for abi in armeabi-v7a arm64-v8a; do
+            bash _canonical_ndk/apk/build-nativeactivity-apk.sh \
+              android/AndroidManifest.xml \
+              "build/android/$abi/libbilliard.so" "$abi" \
+              "build/android/billiard-$abi.apk"
+          done
+      - name: Independently verify finished A1 test APK signer
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/billiard-armeabi-v7a.apk
+          lane: test
+      - name: Independently verify finished C67 test APK signer
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/billiard-arm64-v8a.apk
+          lane: test
+      - name: Reject DEX and wrong-ABI payload in both finished APKs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for abi in armeabi-v7a arm64-v8a; do
+            apk="build/android/billiard-$abi.apk"
+            unzip -Z1 "$apk" | grep -Fx "lib/$abi/libbilliard.so"
+            if unzip -Z1 "$apk" | grep -Eq '(^|/)classes[0-9]*\.dex$'; then
+              echo "unexpected application DEX in $apk" >&2; exit 1
+            fi
+            unzip -p "$apk" "lib/$abi/libbilliard.so" | cmp - "build/android/$abi/libbilliard.so"
+            sha256sum "$apk" "build/android/$abi/libbilliard.so"
+          done
+      - name: Preserve candidate-only paired signed APKs and receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-signed-test-a1-c67-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/billiard-*.apk
+            build/android/billiard-*.receipt.tsv
+            build/android/armeabi-v7a/libbilliard.so
+            build/android/arm64-v8a/libbilliard.so
+          if-no-files-found: error
