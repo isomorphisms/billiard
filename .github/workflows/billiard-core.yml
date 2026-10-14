@@ -1,0 +1,75 @@
+name: Billiard mathematics and Rough scene through pinned ICK
+on:
+  push:
+    branches: [feat/rectangle-core]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ick-native-scene:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact billiard candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout source-pinned Rough dotted/alpha renderer
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: b285fa716945b49fd5f88c45a7cd3f8072ccb445
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Build and qualify the owned ICK C compiler
+        uses: isomorphisms/ai-ci/ick-host@4ea071a96239f3a29ca6d98454feb59947d87cfe
+        id: ick
+      - name: Run exact billiard tests using only ICK
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
+        run: make clean test scene
+      - name: Run real Rough dotted raster tests using only ICK
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
+        run: make -C _rough_framebuffer clean test
+      - name: Render the actual geometry through ICK-produced Rough executable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ./_rough_framebuffer/build/rough-fb build/billiard.ops build/billiard.ppm 360 640
+          grep -Fxq 'D 1.05 6.0' build/billiard.ops
+          grep -Fxq 'A .075' build/billiard.ops
+          python3 - <<'PY'
+          from pathlib import Path
+          data = Path('build/billiard.ppm').read_bytes()
+          header = b'P6\n360 640\n255\n'
+          assert data.startswith(header)
+          pixels = data[len(header):]
+          assert len(pixels) == 360 * 640 * 3
+          assert 0 < pixels.count(b'\xff') < len(pixels)
+          print('ICK-compiled billiard plus Rough pixels: PASS')
+          PY
+      - name: Assert no stock compiler route survives
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make clean
+          if make test > "$RUNNER_TEMP/no-ick.log" 2>&1; then
+            echo "Missing ICK unexpectedly accepted" >&2; exit 1
+          fi
+          grep -Fq 'BLOCKED: pinned ICK_CC' "$RUNNER_TEMP/no-ick.log"
+          if make test ICK_CC=/usr/bin/cc ICK_SOURCE_DIR="$GITHUB_WORKSPACE/.ick-host-source" > "$RUNNER_TEMP/system-cc.log" 2>&1; then
+            echo "Stock compiler unexpectedly accepted" >&2; exit 1
+          fi
+          grep -Fq 'BLOCKED: compiler must be source-qualified ICK' "$RUNNER_TEMP/system-cc.log"
+      - name: Retain the source-pinned ICK-rendered picture
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-ick-rough-scene-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/billiard.ppm
+            build/billiard.ops
+          if-no-files-found: error

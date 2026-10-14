@@ -1,0 +1,177 @@
+name: "Billiard test APKs: ICK-only application C"
+on:
+  push:
+    branches: [feat/rectangle-core]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ick-signed-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout exact billiard source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout pinned rough framebuffer source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: b285fa716945b49fd5f88c45a7cd3f8072ccb445
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Checkout canonical Android-NDK packaging tools
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/android-NDK
+          ref: 42f04d7654d54309ec3f8787bfd2bc40730399d7
+          path: _canonical_ndk
+          persist-credentials: false
+      - name: Checkout existing public test signing key
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphismes/wegert
+          ref: 89dcfb840cec1a66ee04c7f7404954cbd6c09839
+          path: _test_signing
+          sparse-checkout: _/build/app/wegert-debug.keystore
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Checkout narrowly registered AI-CI test signer registry
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: f8f7a903ead157600a5736acea3553272292a061
+          path: _aici_test_signing
+          persist-credentials: false
+      - name: Checkout Cat Food A1/C67 and launcher policy
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/catfood
+          ref: 8ea6c5f7c9fb8aa633af792e45548b103633d8e8
+          path: _catfood
+          persist-credentials: false
+      - name: Resolve Android headers and APK build tools
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - name: Install exact platform headers, linker and APK packager inputs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'platforms;android-34' 'build-tools;36.0.0' 'ndk;29.0.14206865'
+          test -x "$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+      - name: Bind the declared A1 and C67 source/ABI obligations
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p build/android
+          source_sha=$(git rev-parse HEAD)
+          ./_catfood/catfood plan-android-build "$PWD/ci/android-application.tsv" phone "$source_sha" > build/android/catfood-plan.tsv
+          grep -q $'phone\tMIRO_A1\tarmeabi-v7a\trequired\tnot_run' build/android/catfood-plan.tsv
+          grep -q $'c67\tMIRO_C67\tarm64-v8a\trequired\tnot_run' build/android/catfood-plan.tsv
+          sha256sum build/android/catfood-plan.tsv > build/android/catfood-plan.sha256
+      - name: Qualify genuine ICK for A1
+        uses: isomorphisms/ai-ci/ick-android@4ea071a96239f3a29ca6d98454feb59947d87cfe
+        id: a1
+        with:
+          abi: armeabi-v7a
+          ndk: ${{ env.ANDROID_HOME }}/ndk/29.0.14206865
+      - name: Build A1 NativeActivity exclusively from ICK-produced C objects
+        env:
+          ICK_CC: ${{ steps.a1.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-android-armeabi-v7a-source
+        run: make -C android NDK_ROOT="$ANDROID_HOME/ndk/29.0.14206865" ANDROID_ABI=armeabi-v7a ANDROID_API=23
+      - name: Qualify genuine ICK for C67
+        uses: isomorphisms/ai-ci/ick-android@4ea071a96239f3a29ca6d98454feb59947d87cfe
+        id: c67
+        with:
+          abi: arm64-v8a
+          ndk: ${{ env.ANDROID_HOME }}/ndk/29.0.14206865
+      - name: Build C67 NativeActivity exclusively from ICK-produced C objects
+        env:
+          ICK_CC: ${{ steps.c67.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-android-arm64-v8a-source
+        run: make -C android NDK_ROOT="$ANDROID_HOME/ndk/29.0.14206865" ANDROID_ABI=arm64-v8a ANDROID_API=23
+      - name: Strip finished ICK-built binaries and record before/after
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for abi in armeabi-v7a arm64-v8a; do
+            library=build/android/$abi/libbilliard.so
+            test -s "$library"
+            cp "$library" build/android/$abi/libbilliard-unstripped.so
+            "$ndk/llvm-strip" --strip-debug "$library"
+            sha256sum "$library" build/android/$abi/libbilliard-unstripped.so
+            wc -c "$library" build/android/$abi/libbilliard-unstripped.so
+          done
+      - name: Resolve package certificate from the pinned central test registry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cert=$(awk -F '\t' '$1=="org.isomorphisms.billiard" && $2=="test" {print $3}' _aici_test_signing/android-signing/identities.tsv)
+          [[ "$cert" =~ ^[0-9a-f]{64}$ ]] || { echo "Missing registered test certificate" >&2; exit 1; }
+          echo "ANDROID_EXPECTED_CERT_SHA256=$cert" >> "$GITHUB_ENV"
+      - name: Produce paired test-only APKs from the ICK native libraries
+        shell: bash
+        env:
+          ANDROID_PACKAGE_ID: org.isomorphisms.billiard
+          ANDROID_VERSION_CODE: '1'
+          ANDROID_VERSION_NAME: 0.1-test
+          ANDROID_MIN_SDK: '23'
+          ANDROID_TARGET_SDK: '34'
+          ANDROID_EXPECTED_LABEL: Billiard
+          ANDROID_KEYSTORE: ${{ github.workspace }}/_test_signing/_/build/app/wegert-debug.keystore
+          ANDROID_KEYSTORE_TYPE: PKCS12
+          ANDROID_KEY_ALIAS: wegert-debug
+          ANDROID_STORE_PASSWORD: wegert-debug
+          ANDROID_KEY_PASSWORD: wegert-debug
+          ANDROID_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          export ANDROID_BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          for abi in armeabi-v7a arm64-v8a; do
+            bash _canonical_ndk/apk/build-nativeactivity-apk.sh \
+              android/AndroidManifest.xml \
+              "build/android/$abi/libbilliard.so" "$abi" \
+              "build/android/billiard-$abi.apk"
+          done
+      - name: Independently verify A1 APK signer
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/billiard-armeabi-v7a.apk
+          lane: test
+      - name: Independently verify C67 APK signer
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/billiard-arm64-v8a.apk
+          lane: test
+      - name: Require only the declared ABI library with no DEX
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for abi in armeabi-v7a arm64-v8a; do
+            apk="build/android/billiard-$abi.apk"
+            unzip -Z1 "$apk" | grep -Fx "lib/$abi/libbilliard.so"
+            if unzip -Z1 "$apk" | grep -Eq '(^|/)classes[0-9]*\.dex$'; then
+              echo "Unexpected DEX in $apk" >&2; exit 1
+            fi
+            unzip -p "$apk" "lib/$abi/libbilliard.so" | cmp - "build/android/$abi/libbilliard.so"
+            sha256sum "$apk"
+          done
+      - name: Preserve ICK-built test-only APKs and exact receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-ick-test-apks-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/billiard-*.apk
+            build/android/billiard-*.receipt.tsv
+            build/android/catfood-plan.tsv
+            build/android/catfood-plan.sha256
+            build/android/armeabi-v7a/*.o
+            build/android/arm64-v8a/*.o
+          if-no-files-found: warn
