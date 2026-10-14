@@ -19,6 +19,48 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile and run mathematical tests
         run: make clean test CC=${{ matrix.cc }}
+      - name: Generate candidate scene operations
+        run: make scene CC=${{ matrix.cc }}
       - name: Check undefined behavior and address safety
         run: |
           make clean test CC=${{ matrix.cc }} CFLAGS="-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer"
+
+  rough-scene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Pin reviewed rough framebuffer dotted/alpha candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: d8ede905ac83c27370a14b92f81b77d6d189d989
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Build renderer and check its own coverage contract
+        run: make -C _rough_framebuffer clean test
+      - name: Render billiard using same dot and alpha stream
+        run: |
+          make scene
+          ./_rough_framebuffer/build/rough-fb build/billiard.ops build/billiard.ppm 360 640
+          grep -q '^D 1.05 6.0$' build/billiard.ops
+          grep -q '^A .075$' build/billiard.ops
+          python3 - <<'PY'
+          from pathlib import Path
+          data = Path('build/billiard.ppm').read_bytes()
+          header = b'P6\n360 640\n255\n'
+          assert data.startswith(header)
+          image = data[len(header):]
+          assert len(image) == 360 * 640 * 3
+          whites = sum(image[k:k+3] == b'\xff\xff\xff'
+                       for k in range(0, len(image), 3))
+          assert 150000 < whites < 360*640
+          print('actual rough-rendered billiard: PASS')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-rough-scene-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/billiard.ppm
+            build/billiard.ops
