@@ -1,0 +1,24 @@
+name: Billiard rectangle mathematical smoke
+on:
+  push:
+    branches: [feat/rectangle-core]
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Makefile'
+      - '.github/workflows/billiard-core.yml'
+jobs:
+  rectangle:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [cc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run mathematical tests
+        run: make clean test CC=${{ matrix.cc }}
+      - name: Check undefined behavior and address safety
+        run: |
+          make clean test CC=${{ matrix.cc }} CFLAGS="-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer"
