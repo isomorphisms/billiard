@@ -2,7 +2,7 @@ schema	catfood-android-application-v1
 repository	isomorphisms/billiard
 package_id	org.isomorphisms.billiard
 launcher_label	Billiard
-min_sdk	21
+min_sdk	23
 packaging	split
 armeabi-v7a	supported
 arm64-v8a	supported
