@@ -1,4 +1,4 @@
-name: Billiard test APKs: ICK-only application C
+name: "Billiard test APKs: ICK-only application C"
 on:
   push:
     branches: [feat/rectangle-core]
