@@ -12,3 +12,11 @@ test: build/test_billiard
 
 clean:
 	rm -rf build
+
+build/scene_ops: src/billiard.c src/scene.c src/scene_ops.c src/billiard.h src/scene.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc src/billiard.c src/scene.c src/scene_ops.c -o $@ $(LDLIBS)
+
+.PHONY: scene
+scene: build/scene_ops
+	./build/scene_ops > build/billiard.ops
