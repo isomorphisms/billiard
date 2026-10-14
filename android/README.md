@@ -31,16 +31,29 @@ The app produces a bounded software ARGB framebuffer and copies the result
 into a native RGBA window. The source imports the pinned native
 `rough.framebuffer` implementation rather than bundling an altered copy.
 
-## Host compilation
+## ICK-only host and Android compilation
+
+**No GCC, Clang or NDK C compiler may compile Billiard or its imported
+rough.framebuffer code.** Host and A1/C67 C source compilation must run
+through positively verified ICK. ICK's executable historically ends in
+\`gcc\` because of its ancestry; the binary must be the source-built ICK
+revision, not the stock compiler.
+
+The CI uses \`isomorphisms/ai-ci/ick-host\` for mathematical tests and
+\`isomorphisms/ai-ci/ick-android\` for both mobile ABIs. The pinned ICK
+source is \`c61e448251744a2f40ad743ebef1a027bdcd2f9d\`.
+Consumer source is compiled into ICK objects, including Android native app
+glue. Only NDK Bionic headers, CRT and the direct \`ld.lld\` linker are used
+after ICK source compilation. This stage must fail closed if ICK cannot
+compile the required headers or objects.
+
+## Legacy build notes (superseded)
 
 A qualified Linux host with Android NDK `29.0.14206865` and a verified
 checkout of the exact rough.framebuffer dotted/alpha branch at
 `d8ede905ac83c27370a14b92f81b77d6d189d989` can build:
 
-```sh
-make -C android NDK_ROOT="/verified/ndk/29.0.14206865" ANDROID_ABI=armeabi-v7a ANDROID_API=23
-make -C android NDK_ROOT="/verified/ndk/29.0.14206865" ANDROID_ABI=arm64-v8a ANDROID_API=23
-```
+Use the pinned ICK Android action output as `ICK_CC` and its verified source as `ICK_SOURCE_DIR` before invoking the Android Makefile. No default compiler exists.
 
 The paths are illustrative and require verified host inputs, not Termux
 on a phone. `.github/workflows/billiard-native.yml` runs both real builds
@@ -61,3 +74,11 @@ A host-native `.so` is not an APK and cannot be installed. Current status:
 candidate host/math/drawing sources, no claimed signed APK, publication,
 installation, or physical C67/A1 result. Device builds must not fall back
 to compiling on the handset.
+
+
+## Excluded historical evidence
+
+Earlier candidate Android native-library builds and numerical tests invoked
+stock GCC/Clang or an NDK C compiler. They remain visible in historical CI
+but **do not qualify ICK-only deliverables**. The current accepted input is
+an exact-head run of the new ICK workflows, not an older green check.
