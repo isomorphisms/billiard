@@ -405,7 +405,28 @@ enum billiard_polygon_status billiard_polygon_begin(const billiard_polygon *poly
     status = billiard_polygon_locate(polygon, position, &location);
     if (status != BILLIARD_POLYGON_OK) return status;
     if (location != 1) return BILLIARD_POLYGON_INVALID;
-    *ray = (billiard_polygon_ray){position, direction, SIZE_MAX, step_limit, 0.0, 0};
+    *ray = (billiard_polygon_ray){position, direction, SIZE_MAX, step_limit, 0.0, 0, SIZE_MAX};
+    return BILLIARD_POLYGON_OK;
+}
+
+enum billiard_polygon_status billiard_polygon_depart(const billiard_polygon *polygon,
+    size_t vertex, point direction, uint32_t step_limit, billiard_polygon_ray *ray) {
+    if (!ray || !valid_point(direction) || (!sign(direction.x) && !sign(direction.y)))
+        return BILLIARD_POLYGON_INVALID;
+    enum billiard_polygon_status status = billiard_polygon_validate(polygon);
+    if (status != BILLIARD_POLYGON_OK) return status;
+    if (vertex >= polygon->count) return BILLIARD_POLYGON_INVALID;
+    calculation work = {0};
+    point before = difference(&work,polygon->vertex[vertex],polygon->vertex[(vertex+polygon->count-1)%polygon->count]);
+    point after = difference(&work,polygon->vertex[(vertex+1)%polygon->count],polygon->vertex[vertex]);
+    int turn = sign(cross(&work,before,after));
+    int first_side = sign(cross(&work,before,direction));
+    int second_side = sign(cross(&work,after,direction));
+    if (work.failed) return BILLIARD_POLYGON_ARITHMETIC_LIMIT;
+    int allowed = turn >= 0 ? (first_side >= 0 && second_side >= 0) :
+                              (first_side >= 0 || second_side >= 0);
+    if (!allowed) return BILLIARD_POLYGON_INVALID;
+    *ray = (billiard_polygon_ray){polygon->vertex[vertex],direction,SIZE_MAX,step_limit,0.0,0,vertex};
     return BILLIARD_POLYGON_OK;
 }
 
@@ -423,7 +444,14 @@ enum billiard_polygon_status billiard_polygon_next(const billiard_polygon *polyg
     status = billiard_polygon_locate(polygon, ray->position, &location);
     if (status != BILLIARD_POLYGON_OK) return status;
     if (location < 0) return BILLIARD_POLYGON_INVALID;
-    if (location == 0) {
+    if (location == 0 && ray->launch_vertex != SIZE_MAX) {
+        billiard_polygon_ray checked;
+        status = billiard_polygon_depart(polygon,ray->launch_vertex,ray->direction,ray->steps_remaining,&checked);
+        if (status != BILLIARD_POLYGON_OK) return status;
+        point offset = difference(&work,ray->position,checked.position);
+        if (work.failed) return BILLIARD_POLYGON_ARITHMETIC_LIMIT;
+        if (sign(offset.x) || sign(offset.y) || ray->previous_side != SIZE_MAX) return BILLIARD_POLYGON_INVALID;
+    } else if (location == 0) {
         if (ray->previous_side >= polygon->count) return BILLIARD_POLYGON_INVALID;
         point start = polygon->vertex[ray->previous_side];
         point end = polygon->vertex[(ray->previous_side+1)%polygon->count];
@@ -490,5 +518,6 @@ enum billiard_polygon_status billiard_polygon_next(const billiard_polygon *polyg
     ray->distance += length;
     ray->steps_remaining--;
     ray->stopped = status == BILLIARD_POLYGON_VERTEX_STOP;
+    ray->launch_vertex = SIZE_MAX;
     return status;
 }

@@ -37,6 +37,7 @@ typedef struct {
     uint32_t steps_remaining;
     double distance; /* approximate display length; never used in predicates */
     int stopped;
+    size_t launch_vertex; /* SIZE_MAX except for a validated vertex departure */
 } billiard_polygon_ray;
 
 typedef struct {
@@ -85,6 +86,11 @@ enum billiard_polygon_status billiard_polygon_rectangle(const billiard_table *ta
                                                        billiard_polygon *polygon);
 enum billiard_polygon_status billiard_polygon_begin(const billiard_polygon *polygon,
     billiard_exact_point position, billiard_exact_point direction, uint32_t step_limit,
+    billiard_polygon_ray *ray);
+/* A chosen cover chart can depart from a vertex into its closed angular wedge.
+ * This does not allow the polygon engine to continue through a vertex hit. */
+enum billiard_polygon_status billiard_polygon_depart(const billiard_polygon *polygon,
+    size_t vertex, billiard_exact_point direction, uint32_t step_limit,
     billiard_polygon_ray *ray);
 enum billiard_polygon_status billiard_polygon_next(const billiard_polygon *polygon,
     billiard_polygon_ray *ray, billiard_polygon_event *event);
