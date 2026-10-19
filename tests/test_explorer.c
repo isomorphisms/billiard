@@ -16,6 +16,11 @@ static void pixel_file(const char *path) {
     for (unsigned vertical = 0; vertical < height; ++vertical)
         for (unsigned horizontal = 0; horizontal < width; ++horizontal) {
             unsigned char color[3]; assert(fread(color,1,3,input) == 3);
+            /* Independent interior point on the horizontal square orbit,
+             * clear of walls, handles and the moving tip. A blank history
+             * must fail even when walls make overall ink counts pass. */
+            if (strstr(path,"explorer-square.ppm") && horizontal == 230 && vertical == 186)
+                assert(color[0] < 245 && color[2] > color[0]+8 && color[1] > color[0]+4);
             if (color[0] != 255 || color[1] != 255 || color[2] != 255) {
                 ++ink;
                 if (vertical < 70) ++top_ink;
@@ -79,6 +84,14 @@ int main(int argc, char **argv) {
     config.view = BILLIARD_EXPLORER_POLYGON; config.shear_half_steps = 1;
     assert(billiard_explorer_build(&config,model) != 0);
     double previous = 10, distance = 0;
+    assert(billiard_next_speed(0.2,0) == 0.5);
+    assert(billiard_next_speed(0.5,0) == 1.1);
+    assert(billiard_next_speed(1.1,0) == BILLIARD_EXPLORER_MAX_SPEED);
+    assert(billiard_next_speed(BILLIARD_EXPLORER_MAX_SPEED,0) == 0.2);
+    assert(billiard_next_speed(20,1) == 50);
+    assert(billiard_next_speed(50,1) == 110);
+    assert(billiard_next_speed(110,1) == BILLIARD_LEGACY_MAX_SPEED);
+    assert(billiard_next_speed(BILLIARD_LEGACY_MAX_SPEED,1) == 20);
     assert(!billiard_distance_clock(10.05,1,2,&previous,&distance)); assert(fabs(distance-0.1) < 1e-12);
     assert(!billiard_distance_clock(500,0,2,&previous,&distance)); assert(fabs(distance-0.1) < 1e-12);
     assert(!billiard_distance_clock(500.05,1,2,&previous,&distance)); assert(fabs(distance-0.2) < 1e-12);

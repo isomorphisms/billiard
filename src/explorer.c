@@ -87,6 +87,13 @@ int billiard_explorer_build(const billiard_explorer_config *config, billiard_exp
     return 0;
 }
 
+double billiard_next_speed(double current, int legacy) {
+    if (legacy) return current < 50 ? 50 : (current < 110 ? 110 :
+        (current < BILLIARD_LEGACY_MAX_SPEED ? BILLIARD_LEGACY_MAX_SPEED : 20));
+    return current < 0.5 ? 0.5 : (current < 1.1 ? 1.1 :
+        (current < BILLIARD_EXPLORER_MAX_SPEED ? BILLIARD_EXPLORER_MAX_SPEED : 0.2));
+}
+
 int billiard_distance_clock(double now, int playing, double speed, double *previous, double *distance) {
     if (!previous || !distance || !isfinite(now) || !isfinite(*previous) || !isfinite(*distance) ||
         !isfinite(speed) || speed < 0 || *distance < 0) return -1;
@@ -268,15 +275,20 @@ int billiard_explorer_scene(FILE *output, unsigned width, unsigned height, const
         billiard_exact_display(model->source_height)*model->config.start_vertical/24};
     billiard_numeric_point start = project(matrix,layout,initial);
     layout->start_x = start.x; layout->start_y = start.y;
-    fprintf(output,"P 28 107 171\nA .32\nW 1.15\nD 1.05 6.0\nM %.5f %.5f\n",start.x,start.y);
     double visible = model->periodic && distance >= model->total_length ? model->total_length : fmin(distance,model->total_length);
-    for (size_t event = 0; event < model->event_count; ++event) {
+    /* Keep a faint continuous record underneath the dotted trajectory. It is
+     * redrawn from geometry, so clearing the framebuffer does not erase it. */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+      fprintf(output,"P 28 107 171\nA %s\nW 1.15\nD %s\nM %.5f %.5f\n",
+          pass ? ".32" : ".16",pass ? "1.05 6.0" : "0 0",start.x,start.y);
+      for (size_t event = 0; event < model->event_count; ++event) {
         if (visible <= model->distance_start[event]) break;
         double part = clamp((visible-model->distance_start[event])/model->length[event],0,1);
         billiard_numeric_point first = numeric(model->event[event].folded_start), end = numeric(model->event[event].folded_end);
         end.x = first.x+part*(end.x-first.x); end.y = first.y+part*(end.y-first.y);
         end = project(matrix,layout,end); fprintf(output,"L %.5f %.5f\n",end.x,end.y);
         if (part < 1) break;
+      }
     }
     double phase = model->periodic && model->total_length > 0 ? fmod(distance,model->total_length) : fmin(distance,model->total_length);
     billiard_numeric_point tip = start;
@@ -325,7 +337,11 @@ int billiard_explorer_chrome(FILE *output, unsigned width, unsigned height, cons
     if (playing) { line(output,(billiard_numeric_point){16,16},(billiard_numeric_point){16,30}); line(output,(billiard_numeric_point){23,16},(billiard_numeric_point){23,30}); }
     else { line(output,(billiard_numeric_point){16,16},(billiard_numeric_point){28,23}); line(output,(billiard_numeric_point){28,23},(billiard_numeric_point){16,30}); }
     label(output,35,20,0.9,0.8,playing ? "PAUSE" : "PLAY");
-    char text[48]; snprintf(text,sizeof text,"SPEED %.1f",speed); label(output,width-100,20,0.9,0.8,text);
+    char text[48];
+    double maximum = config->view == BILLIARD_EXPLORER_LEGACY ? BILLIARD_LEGACY_MAX_SPEED : BILLIARD_EXPLORER_MAX_SPEED;
+    if (speed >= maximum) snprintf(text,sizeof text,"SPEED MAX");
+    else snprintf(text,sizeof text,"SPEED %.1f",speed);
+    label(output,width-100,20,0.9,0.8,text);
     static const char *const tabs[] = {"SQR","RECT","RIGHT","EQUI","L"};
     for (unsigned tab = 0; tab < BILLIARD_FIXTURE_COUNT; ++tab) {
         label(output,(double)width*tab/BILLIARD_FIXTURE_COUNT+5,46,0.9,tab == (unsigned)config->fixture ? 0.95 : 0.48,tabs[tab]);

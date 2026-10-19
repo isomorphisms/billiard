@@ -5,6 +5,8 @@
 
 #define BILLIARD_EXPLORER_MAX_EVENTS 160u
 #define BILLIARD_EXPLORER_GHOST_EVENTS 8u
+#define BILLIARD_EXPLORER_MAX_SPEED 20.0
+#define BILLIARD_LEGACY_MAX_SPEED 2000.0
 enum billiard_explorer_view { BILLIARD_EXPLORER_LEGACY, BILLIARD_EXPLORER_POLYGON, BILLIARD_EXPLORER_COVER };
 enum billiard_explorer_handle { BILLIARD_EXPLORER_START, BILLIARD_EXPLORER_ANGLE, BILLIARD_EXPLORER_WIDTH };
 typedef struct {
@@ -42,4 +44,5 @@ int billiard_explorer_chrome(FILE *output, unsigned width, unsigned height, cons
 int billiard_explorer_drag(const billiard_explorer_model *model, const billiard_explorer_layout *layout,
     enum billiard_explorer_handle handle, double pixel_x, double pixel_y, billiard_explorer_config *config);
 int billiard_distance_clock(double now, int playing, double speed, double *previous_time, double *distance);
+double billiard_next_speed(double current, int legacy);
 #endif

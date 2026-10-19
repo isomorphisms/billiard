@@ -119,8 +119,8 @@ jobs:
         shell: bash
         env:
           ANDROID_PACKAGE_ID: org.isomorphisms.billiard
-          ANDROID_VERSION_CODE: '2'
-          ANDROID_VERSION_NAME: 0.2-test
+          ANDROID_VERSION_CODE: '3'
+          ANDROID_VERSION_NAME: 0.3-test
           ANDROID_MIN_SDK: '23'
           ANDROID_TARGET_SDK: '34'
           ANDROID_EXPECTED_LABEL: Billiard

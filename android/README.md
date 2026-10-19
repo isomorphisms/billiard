@@ -25,7 +25,7 @@ The physics is independent of the rough display.
 - Drag the starting point: change the relative origin.
 - Drag the launch direction handle: change the starting angle.
 - Tap upper left: play/pause. Tap upper right: cycle travel speeds
-  (20, 50, 110 mathematical pixels/second).
+  (20, 50, 110 mathematical pixels/second, then MAX at 2000).
 - A paused app does not accumulate elapsed time; the progressive trajectory
   is measured by geometric distance rather than counting rebounds.
 - Main box is rough but mathematically sharp. The ray is translucent, dotted.

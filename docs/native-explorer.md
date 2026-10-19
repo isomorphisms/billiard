@@ -17,6 +17,9 @@ the geodesic. `PERIODIC` requires an exact return witness; caps remain
   between 1/2 and 3/2 of the base width. Legacy controls remain continuous.
 - Upper left pauses/resumes. Upper right cycles 0.2, 0.5 and 1.1 source-length
   units per second in mathematical views, or 20, 50 and 110 scene units in legacy.
+  The next tap selects `SPEED MAX`: 20 mathematical units/second or 2000 legacy
+  scene units/second. A further tap returns to the slowest speed. Exact event,
+  arithmetic and singularity bounds still apply at MAX.
 - `SHEAR` enters cover mode and cycles 0, 0.5, 1 and -0.5. This is explicitly
   labelled `AFFINE COVER / FOLDED PROJECTION`; a sheared folded picture does not
   assert ordinary specular reflection in that polygon.
@@ -29,6 +32,20 @@ developed straight direction. Reflected display chords and Rough jitter never
 feed back into the solver. Pause/focus changes update the clock without banking
 elapsed time. Geometry edits reset reveal distance. Periodic tips repeat after
 one certified period; bounded nonperiodic paths stop at their reported endpoint.
+
+A faint continuous blue trace remains beneath the dotted travelled path,
+including while paused and across periodic repeats. It is reconstructed from
+the current trajectory on every redraw, with no unbounded framebuffer history.
+Changing geometry recomputes the trace; it does not retain an old polygon's
+strokes. Rough walls and faint unfolded copies keep their existing style.
+
+On 19 October 2026 the user reported that much of version 0.2-test works on the
+C67 and supplied five app screenshots (square, equilateral, L flow/cone stop,
+and legacy rectangle). This is bounded user-reported physical feedback, not
+blanket A1 acceptance or physical qualification of version 0.3-test. The requested
+visible trails and MAX speed are the follow-up changes. Curved-wall caustics
+remain outside the implemented polygon fixtures; the L cone stop is a separate
+exact singularity event.
 
 The lower panel shows at most eight genuinely developed chart copies with
 paired side identifiers and a faint straight ray. The solver retains at most
@@ -49,7 +66,7 @@ streams and PPMs. These are host images, not screenshots from Android.
 ## Package and physical evidence
 
 The existing Cat Food paired build plan and canonical NativeActivity packager
-produce version 2 / `0.2-test` candidates for A1 `armeabi-v7a` and C67
+produce version 3 / `0.3-test` candidates for A1 `armeabi-v7a` and C67
 `arm64-v8a`. All application, math, renderer and glue C use pinned ICK. ARM32
 division support is assembled from the same verified ICK reference source.
 The existing registered test signer is retained. The package is
@@ -69,7 +86,7 @@ input, and a verdict for each case below. A C67 receipt cannot substitute for A1
 
 | Physical case | Required observation | A1 | C67 |
 | --- | --- | --- | --- |
-| Install and launch | Matching ABI, version 2, visible NativeActivity | NOT RUN | NOT RUN |
+| Install and launch | Matching ABI, version 3, visible NativeActivity | NOT RUN | NOT RUN |
 | Legacy rectangle | Right wall/start/angle recompute; corner reversal | NOT RUN | NOT RUN |
 | Pause/resume | Fixed tip while paused; no accumulated-time jump | NOT RUN | NOT RUN |
 | All five tabs | Rough walls, dotted path, faint copies, usable controls | NOT RUN | NOT RUN |

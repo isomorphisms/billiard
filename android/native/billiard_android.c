@@ -231,8 +231,8 @@ static int32_t touch(struct android_app *app,AInputEvent *event) {
         if(py<38) {
             if(px<s->image_width*.45) s->playing=!s->playing;
             else if(s->explorer.view==BILLIARD_EXPLORER_LEGACY)
-                s->speed=s->speed<50.0?50.0:(s->speed<110.0?110.0:20.0);
-            else s->explorer_speed=s->explorer_speed<0.5?0.5:(s->explorer_speed<1.1?1.1:0.2);
+                s->speed=billiard_next_speed(s->speed,1);
+            else s->explorer_speed=billiard_next_speed(s->explorer_speed,0);
             s->previous_time=now_seconds();
             s->drag=TOUCH_NONE;
         } else if(py>=38 && py<66) {
