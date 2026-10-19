@@ -1,0 +1,76 @@
+name: Billiard ICK-only Android objects and native linking
+on:
+  push:
+    branches: [feat/rectangle-core]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ick-native:
+    name: ICK C on ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [armeabi-v7a, arm64-v8a]
+    steps:
+      - name: Checkout exact billiard candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout exact Rough framebuffer application C
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/rough.framebuffer
+          ref: b285fa716945b49fd5f88c45a7cd3f8072ccb445
+          path: _rough_framebuffer
+          persist-credentials: false
+      - name: Set up SDK headers and native system linker
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - name: Install exact Android NDK Bionic and linker inputs
+        shell: bash
+        run: sdkmanager 'ndk;29.0.14206865'
+      - name: Build and qualify source-pinned ICK for this ABI
+        id: ick
+        uses: isomorphisms/ai-ci/ick-android@4ea071a96239f3a29ca6d98454feb59947d87cfe
+        with:
+          abi: ${{ matrix.abi }}
+          ndk: ${{ env.ANDROID_HOME }}/ndk/29.0.14206865
+      - name: Compile every billiard, Rough and Android-glue source through ICK
+        shell: bash
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-android-${{ matrix.abi }}-source
+        run: |
+          set -Eeuo pipefail
+          make -C android objects NDK_ROOT="$ANDROID_HOME/ndk/29.0.14206865" ANDROID_ABI=${{ matrix.abi }} ANDROID_API=23
+          readelf="$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          for object in build/android/${{ matrix.abi }}/*.o; do
+            test -s "$object"
+            "$readelf" -h "$object" | grep -q 'Class:'
+            "$readelf" -h "$object" | grep -q 'Machine:'
+          done
+          sha256sum build/android/${{ matrix.abi }}/*.o > build/android/${{ matrix.abi }}/objects.sha256
+          printf 'c_compiler\tick\nick_source\tc61e448251744a2f40ad743ebef1a027bdcd2f9d\nabi\t${{ matrix.abi }}\nndk_role\theaders-linker-only\n' > build/android/${{ matrix.abi }}/compiler.tsv
+      - name: Link ICK-generated objects without another C compiler
+        shell: bash
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-android-${{ matrix.abi }}-source
+        run: |
+          set -Eeuo pipefail
+          make -C android NDK_ROOT="$ANDROID_HOME/ndk/29.0.14206865" ANDROID_ABI=${{ matrix.abi }} ANDROID_API=23
+          lib=build/android/${{ matrix.abi }}/libbilliard.so
+          test -s "$lib"
+          sha256sum "$lib" > build/android/${{ matrix.abi }}/linked.sha256
+      - name: Preserve exact ICK object and linker evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-ick-native-${{ matrix.abi }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/android/${{ matrix.abi }}/
+          if-no-files-found: warn

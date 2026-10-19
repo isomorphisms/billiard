@@ -1,0 +1,7 @@
+build_id	target	toolchain	ick_revision	ick_status	ick_evidence
+rectangle-host	x86_64-linux-gnu	ick	c61e448251744a2f40ad743ebef1a027bdcd2f9d	pending	ick-host source-built tests required at exact billed source commit; stock compiler passes superseded
+rough-host	x86_64-linux-gnu	ick	c61e448251744a2f40ad743ebef1a027bdcd2f9d	pending	Imported rough.framebuffer b285fa716945b49fd5f88c45a7cd3f8072ccb445 must be compiled and rendered through pinned host ICK
+a1-owned-c	armeabi-v7a	ick	c61e448251744a2f40ad743ebef1a027bdcd2f9d	pending	Every billiard/rough/glue C translation unit through ICK, including Bionic headers
+c67-owned-c	arm64-v8a	ick	c61e448251744a2f40ad743ebef1a027bdcd2f9d	pending	Every billiard/rough/glue C translation unit through ICK with Android-reserved x18
+a1-platform-link	armeabi-v7a	ndk	c61e448251744a2f40ad743ebef1a027bdcd2f9d	gap:direct-bionic-ld-lld-unverified	No other C compiler; NDK only CRT/Bionic/direct ld.lld on already ICK-generated .o
+c67-platform-link	arm64-v8a	ndk	c61e448251744a2f40ad743ebef1a027bdcd2f9d	gap:direct-bionic-ld-lld-unverified	No other C compiler; NDK only CRT/Bionic/direct ld.lld on already ICK-generated .o
