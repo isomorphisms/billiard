@@ -1,7 +1,7 @@
 name: Billiard mathematics and Rough scene through pinned ICK
 on:
   push:
-    branches: [feat/rectangle-core]
+    branches: [main, feat/rectangle-core]
   pull_request:
 permissions:
   contents: read
