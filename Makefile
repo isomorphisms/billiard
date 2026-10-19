@@ -22,8 +22,13 @@ build/test_billiard: src/billiard.c src/billiard.h src/pixel_sample.h tests/test
 	@mkdir -p build
 	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/billiard.c tests/test_billiard.c -o $@ $(LDLIBS)
 
-test: build/test_billiard
+build/test_polygon: src/polygon.c src/polygon.h src/billiard.c src/billiard.h tests/test_polygon.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/polygon.c src/billiard.c tests/test_polygon.c -o $@ $(LDLIBS)
+
+test: build/test_billiard build/test_polygon
 	./build/test_billiard
+	./build/test_polygon
 
 build/scene_ops: src/billiard.c src/scene.c src/scene_ops.c src/billiard.h src/scene.h check-ick
 	@mkdir -p build
