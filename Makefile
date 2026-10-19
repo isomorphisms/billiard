@@ -7,6 +7,8 @@ ICK_CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fn
 LDLIBS = -lm
 EXPERIMENT_SOURCES = src/experiments.c src/cylinders.c src/flow.c src/periods.c src/affine.c src/surface.c src/polygon.c src/billiard.c
 EXPERIMENT_HEADERS = $(wildcard src/*.h)
+EXPLORER_SOURCES = src/explorer.c src/cylinders.c src/flow.c src/periods.c src/affine.c src/surface.c src/polygon.c src/billiard.c
+ROUGH_BIN ?= $(abspath _rough_framebuffer/build/rough-fb)
 SOURCE_REVISION := $(shell git rev-parse HEAD)
 SOURCE_STATE := $(if $(shell git status --porcelain),working_tree,commit)
 ICK_SOURCE_SHA = c61e448251744a2f40ad743ebef1a027bdcd2f9d
@@ -60,7 +62,36 @@ experiments: build/billiard-experiments
 	sha256sum "$(ICK_CC)" "$$("$(ICK_CC)" -print-prog-name=cc1)" build/billiard-experiments build/bil-orbit.tsv > build/experiment-producer.sha256
 	printf 'source_revision\t%s\nsource_state\t%s\ncompiler_source\t%s\ncompiler_reference\t%s\n' "$(SOURCE_REVISION)" "$(SOURCE_STATE)" "$(ICK_SOURCE_SHA)" "$(ICK_REFERENCE_SHA)" > build/experiment-producer.tsv
 
-test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders build/test_periods build/test_experiments
+build/test_explorer: $(EXPLORER_SOURCES) $(EXPERIMENT_HEADERS) src/scene.c tests/test_explorer.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc $(EXPLORER_SOURCES) src/scene.c tests/test_explorer.c -o $@ $(LDLIBS)
+
+build/explorer-scene: $(EXPLORER_SOURCES) $(EXPERIMENT_HEADERS) src/explorer_scene_ops.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc $(EXPLORER_SOURCES) src/explorer_scene_ops.c -o $@ $(LDLIBS)
+
+.PHONY: explorer-scenes explorer-pixels
+explorer-scenes: build/explorer-scene
+	./build/explorer-scene 0 > build/explorer-square.ops
+	./build/explorer-scene 1 > build/explorer-rectangle.ops
+	./build/explorer-scene 2 > build/explorer-right.ops
+	./build/explorer-scene 3 > build/explorer-equilateral.ops
+	./build/explorer-scene 4 > build/explorer-L.ops
+	./build/explorer-scene 4 3 > build/explorer-cone.ops
+	./build/explorer-scene 4 0 1 > build/explorer-affine.ops
+
+explorer-pixels: explorer-scenes build/test_explorer
+	test -x "$(ROUGH_BIN)"
+	"$(ROUGH_BIN)" build/explorer-square.ops build/explorer-square.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-rectangle.ops build/explorer-rectangle.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-right.ops build/explorer-right.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-equilateral.ops build/explorer-equilateral.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-L.ops build/explorer-L.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-cone.ops build/explorer-cone.ppm 360 640
+	"$(ROUGH_BIN)" build/explorer-affine.ops build/explorer-affine.ppm 360 640
+	./build/test_explorer build/explorer-square.ppm build/explorer-rectangle.ppm build/explorer-right.ppm build/explorer-equilateral.ppm build/explorer-L.ppm build/explorer-cone.ppm build/explorer-affine.ppm
+
+test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders build/test_periods build/test_experiments build/test_explorer
 	./build/test_billiard
 	./build/test_polygon
 	./build/test_surface
@@ -68,6 +99,7 @@ test: build/test_billiard build/test_polygon build/test_surface build/test_flow 
 	./build/test_cylinders
 	./build/test_periods
 	./build/test_experiments
+	./build/test_explorer
 
 build/scene_ops: src/billiard.c src/scene.c src/scene_ops.c src/billiard.h src/scene.h check-ick
 	@mkdir -p build

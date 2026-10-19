@@ -13,6 +13,10 @@ See the [Cat Food application contract](../ci/android-application.tsv)
 
 ## User interaction
 
+The rectangle below remains the initial legacy scene. The new fixture tabs,
+exact polygon/cover views, cylinder labels and affine controls are documented
+with their limits in [native explorer](../docs/native-explorer.md).
+
 Initial point is one-third from the top and centered horizontally. Initial
 direction is 45° up-right. A corner reverses the entering velocity exactly.
 The physics is independent of the rough display.
@@ -70,10 +74,12 @@ installable APK candidates. After that: independent AICI test, emulator
 screenshot movement verification, physical C67 drag/direction/path acceptance,
 and separate A1 physical acceptance.
 
-A host-native `.so` is not an APK and cannot be installed. Current status:
-candidate host/math/drawing sources, no claimed signed APK, publication,
-installation, or physical C67/A1 result. Device builds must not fall back
-to compiling on the handset.
+A native `.so` alone is not an APK and cannot be installed. Exact-head CI
+produces paired signed test-only APK candidates and package receipts after
+ICK-only compilation. Verify the run and receipt for the actual source version;
+an earlier rectangle APK does not contain the explorer. Installation and
+physical C67/A1 results remain NOT RUN. Device builds must not fall back to
+compiling on the handset.
 
 
 ## Excluded historical evidence
@@ -87,9 +93,9 @@ an exact-head run of the new ICK workflows, not an older green check.
 
 The direct linker must also receive arithmetic support normally added by a
 compiler driver. The pinned ARMv7-A target cannot assume hardware integer
-division. `android/Makefile` assembles `L_udivsi3` and `L_dvmd_lnx` from the
+division. `android/Makefile` assembles `L_udivsi3`, `L_divsi3` and `L_dvmd_lnx` from the
 verified ICK reference's `libgcc/config/arm/lib1funcs.S` through the same ICK
-driver. This supplies unsigned division/remainder and the divide-by-zero
+driver. This supplies signed/unsigned division/remainder and the divide-by-zero
 handler (which calls Bionic `raise`). Its source carries the GCC Runtime
 Library Exception. No prebuilt stock compiler runtime is linked.
 

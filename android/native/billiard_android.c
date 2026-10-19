@@ -17,6 +17,7 @@
 #include "scene.h"
 #include "pixel_sample.h"
 #include "framebuffer.h"
+#include "explorer.h"
 
 #define TAG "Billiard"
 #define LIMIT_PIXELS 450000u
@@ -37,6 +38,11 @@ typedef struct {
     int active_pointer;
     enum touch_mode drag;
     unsigned long frame, input;
+    billiard_explorer_config explorer;
+    billiard_explorer_model *model;
+    billiard_explorer_layout explorer_layout;
+    double explorer_distance, explorer_speed;
+    int geometry_dirty;
 } state;
 
 static double clamp(double x, double a, double b) {
@@ -82,6 +88,17 @@ static unsigned painted_count(const uint32_t *pixels,size_t count,uint64_t *hash
 
 static void paint(state *s) {
     if(!s->app || !s->app->window) return;
+    /* Exact topology/flow work must not hold an Android window buffer. */
+    if(s->explorer.view!=BILLIARD_EXPLORER_LEGACY) {
+        if(!s->model)s->model=calloc(1,sizeof *s->model);
+        if(!s->model)return;
+        if(s->geometry_dirty) {
+            int built=billiard_explorer_build(&s->explorer,s->model);
+            if(built && !s->model->geometry_valid)
+                __android_log_print(ANDROID_LOG_ERROR,TAG,"explorer geometry rejected");
+            s->geometry_dirty=0;
+        }
+    }
     ANativeWindow_Buffer win;
     if(ANativeWindow_lock(s->app->window,&win,NULL)<0)return;
     if(!win.bits || win.width<160 || win.height<320 ||
@@ -102,15 +119,14 @@ static void paint(state *s) {
     size_t bytes=0;
     FILE *writer=open_memstream(&operations,&bytes);
     if(!writer) {ANativeWindow_unlockAndPost(s->app->window);return;}
-    int valid=billiard_scene(writer,rw,rh,&s->controls,&s->layout);
-    /* On-screen play/pause and speed controls. */
-    fprintf(writer,"P 55 85 100\nA .7\nW 2\nD 0 0\n");
-    if(s->playing)
-        fprintf(writer,"M 16 16\nL 16 30\nM 23 16\nL 23 30\n");
-    else
-        fprintf(writer,"M 16 16\nL 28 23\nL 16 30\nL 16 16\n");
-    fprintf(writer,"M %.2f 16\nL %.2f 29\n",
-            (double)rw-20.,(double)rw-20.);
+    int valid;
+    if(s->explorer.view==BILLIARD_EXPLORER_LEGACY) {
+        valid=billiard_scene(writer,rw,rh,&s->controls,&s->layout);
+    } else {
+        valid=billiard_explorer_scene(writer,rw,rh,s->model,s->explorer_distance,&s->explorer_layout);
+    }
+    if(!valid)valid=billiard_explorer_chrome(writer,rw,rh,&s->explorer,s->model,s->playing,
+        s->explorer.view==BILLIARD_EXPLORER_LEGACY?s->speed:s->explorer_speed);
     if(fclose(writer) || valid) {
         free(operations);ANativeWindow_unlockAndPost(s->app->window);return;
     }
@@ -146,10 +162,32 @@ static void paint(state *s) {
         "FRAME seq=%lu input=%lu width_factor=%.4f angle=%.4f travel=%.4f speed=%.2f painted=%u hash=%016llx",
         s->frame,s->input,s->controls.width_factor,s->controls.launch_degrees,
         s->controls.distance,s->speed,painted,(unsigned long long)hash);
+    if(s->explorer.view!=BILLIARD_EXPLORER_LEGACY && s->model)
+        __android_log_print(ANDROID_LOG_INFO,TAG,
+            "MATH frame=%lu fixture=%d view=%d heading=%u start=%u,%u width=%u shear=%d distance=%.6f flow=%d events=%zu periodic=%d polygon_vertex=%d cylinder_status=%d cylinders=%zu",
+            s->frame,s->explorer.fixture,s->explorer.view,s->explorer.heading,
+            s->explorer.start_horizontal,s->explorer.start_vertical,s->explorer.width_ticks,
+            s->explorer.shear_half_steps,s->explorer_distance,s->model->flow_status,
+            s->model->event_count,s->model->periodic,s->model->polygon_vertex_stop,
+            s->model->cylinder_status,s->model->cylinder_count);
 }
 
 static double proximity(double x,double y,double u,double v) {
     return hypot(x-u,y-v);
+}
+
+static void enter_mathematics(state *s) {
+    if(s->explorer.view!=BILLIARD_EXPLORER_LEGACY)return;
+    s->explorer.width_ticks=(unsigned)lround(clamp(16*s->controls.width_factor,8,24));
+    s->explorer.start_horizontal=(unsigned)lround(clamp(24*s->controls.start_u,1,23));
+    s->explorer.start_vertical=(unsigned)lround(clamp(24*(1-s->controls.start_v),1,23));
+    long heading=lround(s->controls.launch_degrees/15);
+    s->explorer.heading=(unsigned)((heading%24+24)%24);
+    s->explorer.view=BILLIARD_EXPLORER_COVER;
+}
+
+static void changed_geometry(state *s) {
+    s->geometry_dirty=1;s->dirty=1;s->explorer_distance=0;s->previous_time=now_seconds();
 }
 
 static int32_t touch(struct android_app *app,AInputEvent *event) {
@@ -190,10 +228,48 @@ static int32_t touch(struct android_app *app,AInputEvent *event) {
 
     if(kind==AMOTION_EVENT_ACTION_DOWN ||
        kind==AMOTION_EVENT_ACTION_POINTER_DOWN) {
-        if(py<45) {
+        if(py<38) {
             if(px<s->image_width*.45) s->playing=!s->playing;
-            else s->speed=s->speed<50.0?50.0:(s->speed<110.0?110.0:20.0);
+            else if(s->explorer.view==BILLIARD_EXPLORER_LEGACY)
+                s->speed=s->speed<50.0?50.0:(s->speed<110.0?110.0:20.0);
+            else s->explorer_speed=s->explorer_speed<0.5?0.5:(s->explorer_speed<1.1?1.1:0.2);
             s->previous_time=now_seconds();
+            s->drag=TOUCH_NONE;
+        } else if(py>=38 && py<66) {
+            unsigned selected=(unsigned)clamp(floor(px*BILLIARD_FIXTURE_COUNT/s->image_width),0,BILLIARD_FIXTURE_COUNT-1);
+            enum billiard_fixture fixture=(enum billiard_fixture)selected;
+            s->explorer=billiard_explorer_defaults(fixture,fixture==BILLIARD_RECTANGLE?BILLIARD_EXPLORER_LEGACY:BILLIARD_EXPLORER_COVER);
+            if(fixture==BILLIARD_RECTANGLE) {
+                s->controls=(billiard_controls){1.0,.5,1.0/3.0,45.0,0.0};s->explorer.show_cylinders=0;
+            }
+            s->drag=TOUCH_NONE;changed_geometry(s);
+        } else if(py>s->image_height-57) {
+            unsigned button=(unsigned)clamp(floor(px*3/s->image_width),0,2);
+            if(button==0) {
+                if(s->explorer.fixture==BILLIARD_RECTANGLE) {
+                    if(s->explorer.view==BILLIARD_EXPLORER_LEGACY) {enter_mathematics(s);s->explorer.view=BILLIARD_EXPLORER_POLYGON;}
+                    else if(s->explorer.view==BILLIARD_EXPLORER_POLYGON)s->explorer.view=BILLIARD_EXPLORER_COVER;
+                    else {
+                        s->explorer.view=BILLIARD_EXPLORER_LEGACY;s->explorer.show_cylinders=0;
+                        s->controls.width_factor=s->explorer.width_ticks/16.0;
+                        s->controls.start_u=s->explorer.start_horizontal/24.0;
+                        s->controls.start_v=1-s->explorer.start_vertical/24.0;
+                        s->controls.launch_degrees=15*s->explorer.heading;s->controls.distance=0;
+                    }
+                } else s->explorer.view=s->explorer.view==BILLIARD_EXPLORER_POLYGON?BILLIARD_EXPLORER_COVER:BILLIARD_EXPLORER_POLYGON;
+                if(s->explorer.view!=BILLIARD_EXPLORER_COVER)s->explorer.shear_half_steps=0;
+            } else if(button==1) {
+                enter_mathematics(s);s->explorer.view=BILLIARD_EXPLORER_COVER;
+                s->explorer.shear_half_steps=s->explorer.shear_half_steps==2?-1:s->explorer.shear_half_steps+1;
+            } else {
+                enter_mathematics(s);s->explorer.show_cylinders=!s->explorer.show_cylinders;
+            }
+            s->drag=TOUCH_NONE;changed_geometry(s);
+        } else if(s->explorer.view!=BILLIARD_EXPLORER_LEGACY && s->model) {
+            if(proximity(px,py,s->explorer_layout.handle_x,s->explorer_layout.handle_y)<20)s->drag=TOUCH_ANGLE;
+            else if(proximity(px,py,s->explorer_layout.start_x,s->explorer_layout.start_y)<20)s->drag=TOUCH_START;
+            else if(s->explorer.fixture==BILLIARD_RECTANGLE && proximity(px,py,s->explorer_layout.wall_x,s->explorer_layout.wall_y)<30)s->drag=TOUCH_WIDTH;
+            else s->drag=TOUCH_NONE;
         } else if(proximity(px,py,s->layout.handle_x,s->layout.handle_y)<20.0)
             s->drag=TOUCH_ANGLE;
         else if(proximity(px,py,s->layout.start_x,s->layout.start_y)<20.0)
@@ -204,7 +280,11 @@ static int32_t touch(struct android_app *app,AInputEvent *event) {
             s->drag=TOUCH_WIDTH;
         else s->drag=TOUCH_NONE;
     } else if(kind==AMOTION_EVENT_ACTION_MOVE) {
-        if(s->drag==TOUCH_WIDTH)
+        if(s->explorer.view!=BILLIARD_EXPLORER_LEGACY && s->model && s->drag!=TOUCH_NONE) {
+            enum billiard_explorer_handle handle=s->drag==TOUCH_WIDTH?BILLIARD_EXPLORER_WIDTH:
+                (s->drag==TOUCH_START?BILLIARD_EXPLORER_START:BILLIARD_EXPLORER_ANGLE);
+            if(billiard_explorer_drag(s->model,&s->explorer_layout,handle,px,py,&s->explorer)>0)changed_geometry(s);
+        } else if(s->drag==TOUCH_WIDTH)
             s->controls.width_factor=clamp((px-s->layout.left)/
                                              (s->image_width*.53),.5,1.4);
         else if(s->drag==TOUCH_START) {
@@ -248,6 +328,8 @@ void android_main(struct android_app *app) {
     s.app=app;
     s.controls=(billiard_controls){1.0,.5,1.0/3.0,45.0,0.0};
     s.speed=50.0;s.playing=1;s.active_pointer=-1;
+    s.explorer=billiard_explorer_defaults(BILLIARD_RECTANGLE,BILLIARD_EXPLORER_LEGACY);
+    s.explorer.show_cylinders=0;s.explorer_speed=0.5;s.geometry_dirty=1;
     s.previous_time=now_seconds();
     app->userData=&s;
     app->onAppCmd=command;
@@ -265,17 +347,22 @@ void android_main(struct android_app *app) {
         }
         if(app->destroyRequested)break;
         double current=now_seconds();
-        double dt=clamp(current-s.previous_time,0.0,.08);
-        s.previous_time=current;
-        if(s.playing && s.focused && app->window) {
-            if(s.controls.distance<20000.0) {
-                s.controls.distance=fmin(20000.0,s.controls.distance+s.speed*dt);
-                s.dirty=1;
-            } else s.playing=0;
+        int advancing=s.playing && s.focused && app->window;
+        double *distance=s.explorer.view==BILLIARD_EXPLORER_LEGACY?&s.controls.distance:&s.explorer_distance;
+        double speed=s.explorer.view==BILLIARD_EXPLORER_LEGACY?s.speed:s.explorer_speed;
+        if(billiard_distance_clock(current,advancing,speed,&s.previous_time,distance))s.playing=0;
+        if(advancing) {
+            if(s.explorer.view==BILLIARD_EXPLORER_LEGACY) {
+                if(s.controls.distance>=20000.0){s.controls.distance=20000.0;s.playing=0;}
+            } else if(s.model && !s.geometry_dirty && !s.model->periodic && s.explorer_distance>=s.model->total_length) {
+                s.explorer_distance=s.model->total_length;s.playing=0;
+            }
+            s.dirty=1;
         }
         if(s.dirty && s.focused && app->window) {
             s.dirty=0;paint(&s);
         }
     }
     free(s.pixels);
+    free(s.model);
 }
