@@ -38,12 +38,17 @@ build/test_cylinders: src/cylinders.c src/cylinders.h src/flow.c src/flow.h src/
 	@mkdir -p build
 	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/cylinders.c src/flow.c src/surface.c src/polygon.c src/billiard.c tests/test_cylinders.c -o $@ $(LDLIBS)
 
-test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders
+build/test_periods: src/periods.c src/periods.h src/affine.c src/affine.h src/surface.c src/surface.h src/exact_geometry.h src/polygon.c src/polygon.h src/billiard.c tests/test_periods.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/periods.c src/affine.c src/surface.c src/polygon.c src/billiard.c tests/test_periods.c -o $@ $(LDLIBS)
+
+test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders build/test_periods
 	./build/test_billiard
 	./build/test_polygon
 	./build/test_surface
 	./build/test_flow
 	./build/test_cylinders
+	./build/test_periods
 
 build/scene_ops: src/billiard.c src/scene.c src/scene_ops.c src/billiard.h src/scene.h check-ick
 	@mkdir -p build
