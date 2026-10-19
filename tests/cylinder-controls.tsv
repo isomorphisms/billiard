@@ -1,0 +1,6 @@
+fixture	direction	cylinders	primitive_parameters	areas	genuine_connections
+square-cover	1,0	1	2	4	0
+right-isosceles-cover	1,0	1	4	16	0
+equilateral-cover	1,0	1	6	6sqrt(3)	0
+L-cover	1,0	2	4;2	8;4	3
+L-cover	1,1	1	6	12	3

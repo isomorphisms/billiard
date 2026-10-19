@@ -1,7 +1,7 @@
 name: "Billiard test APKs: ICK-only application C"
 on:
   push:
-    branches: [feat/rectangle-core]
+    branches: [main, feat/rectangle-core]
   pull_request:
 permissions:
   contents: read
