@@ -82,3 +82,19 @@ Earlier candidate Android native-library builds and numerical tests invoked
 stock GCC/Clang or an NDK C compiler. They remain visible in historical CI
 but **do not qualify ICK-only deliverables**. The current accepted input is
 an exact-head run of the new ICK workflows, not an older green check.
+
+## ARM32 integer division support
+
+The direct linker must also receive arithmetic support normally added by a
+compiler driver. The pinned ARMv7-A target cannot assume hardware integer
+division. `android/Makefile` assembles `L_udivsi3` and `L_dvmd_lnx` from the
+verified ICK reference's `libgcc/config/arm/lib1funcs.S` through the same ICK
+driver. This supplies unsigned division/remainder and the divide-by-zero
+handler (which calls Bionic `raise`). Its source carries the GCC Runtime
+Library Exception. No prebuilt stock compiler runtime is linked.
+
+The renderer's checked 8192 × 1000 bounds allow exact 32-bit pixel products.
+That removes its 64-bit division requirement but still needs the ARM EABI
+32-bit divide helper. Host tests compare the bounded mapping with the old
+64-bit formula. Native link success and physical runtime acceptance remain
+separate evidence.

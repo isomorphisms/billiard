@@ -35,6 +35,13 @@ BUILTIN := $(shell if test -x "$(ICK_CC)"; then "$(ICK_CC)" -print-file-name=inc
 GLUE := $(NDK_ROOT)/sources/android/native_app_glue
 OUTDIR := ../build/android/$(ANDROID_ABI)
 OBJECTS := $(OUTDIR)/billiard.o $(OUTDIR)/scene.o $(OUTDIR)/framebuffer.o $(OUTDIR)/activity.o $(OUTDIR)/app_glue.o
+ifeq ($(ANDROID_ABI),armeabi-v7a)
+  # ARMv7-A does not promise a hardware divide instruction. Build the exact
+  # EABI helper from the already verified ICK GCC reference, using ICK's own
+  # preprocessing/assembler driver. No NDK/system compiler or runtime archive.
+  ICK_ARM_RUNTIME := $(ICK_SOURCE_DIR)/gcc/libgcc/config/arm/lib1funcs.S
+  OBJECTS += $(OUTDIR)/ick_uidiv.o $(OUTDIR)/ick_divzero.o
+endif
 LIBRARY := $(OUTDIR)/libbilliard.so
 
 CFLAGS_ICK := $(TARGET_FLAGS) --sysroot="$(SYSROOT)" -nostdinc -isystem "$(BUILTIN)" -isystem "$(SYSROOT)/usr/include" -isystem "$(SYSROOT)/usr/include/$(NDK_TRIPLE)" -isystem "$(GLUE)" -I../src -I"$(ROUGH_SRC)" -D__ANDROID__ -D__ANDROID_API__=$(ANDROID_API) -D__ANDROID_MIN_SDK_VERSION__=$(ANDROID_API) -DBIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD -std=gnu11 -O2 -fPIC -Wall -Wextra -Werror -Wno-unused-parameter
@@ -74,6 +81,14 @@ $(OUTDIR)/activity.o: ../android/native/billiard_android.c ../src/scene.h ../src
 $(OUTDIR)/app_glue.o: $(GLUE)/android_native_app_glue.c check-ick
 	@mkdir -p "$(OUTDIR)"
 	"$(ICK_CC)" $(CFLAGS_ICK) -c "$<" -o "$@"
+
+$(OUTDIR)/ick_uidiv.o: check-ick
+	@mkdir -p "$(OUTDIR)"
+	"$(ICK_CC)" $(TARGET_FLAGS) -fPIC -x assembler-with-cpp -DL_udivsi3 -c "$(ICK_ARM_RUNTIME)" -o "$@"
+
+$(OUTDIR)/ick_divzero.o: check-ick
+	@mkdir -p "$(OUTDIR)"
+	"$(ICK_CC)" $(TARGET_FLAGS) -fPIC -x assembler-with-cpp -DL_dvmd_lnx -c "$(ICK_ARM_RUNTIME)" -o "$@"
 
 $(LIBRARY): $(OBJECTS)
 	"$(NDK_BIN)/ld.lld" -shared --no-undefined --hash-style=gnu -z relro -z now $(PAGE_FLAGS) --sysroot="$(SYSROOT)" -soname libbilliard.so -L"$(LIBDIR)" -o "$@" "$(LIBDIR)/crtbegin_so.o" $(OBJECTS) -landroid -llog -lm -lc -ldl "$(LIBDIR)/crtend_so.o"

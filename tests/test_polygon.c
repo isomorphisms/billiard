@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>
 
 static billiard_exact number(int32_t rational, int32_t radical, int32_t denominator) {
     billiard_exact result;
@@ -16,6 +15,15 @@ static billiard_exact_point integral(int32_t x, int32_t y) {
 static int same_number(billiard_exact first, billiard_exact second) {
     return first.rational == second.rational && first.radical == second.radical &&
            first.denominator == second.denominator;
+}
+static int same_ray(billiard_polygon_ray first, billiard_polygon_ray second) {
+    return same_number(first.position.x, second.position.x) &&
+           same_number(first.position.y, second.position.y) &&
+           same_number(first.direction.x, second.direction.x) &&
+           same_number(first.direction.y, second.direction.y) &&
+           first.previous_side == second.previous_side &&
+           first.steps_remaining == second.steps_remaining &&
+           first.distance == second.distance && first.stopped == second.stopped;
 }
 static void rational_equal(billiard_exact value, int64_t numerator, int64_t denominator) {
     assert(!value.radical);
@@ -120,7 +128,7 @@ static void compare_grid(void) {
                         enum billiard_polygon_status stopped = expected.vertex == SIZE_MAX ?
                             BILLIARD_POLYGON_STEP_LIMIT : BILLIARD_POLYGON_STOPPED;
                         assert(billiard_polygon_next(&polygon,&ray,&event) == stopped);
-                        assert(!memcmp(&ray,&saved,sizeof ray));
+                        assert(same_ray(ray,saved));
                         compared++;
                     }
             }
@@ -205,7 +213,7 @@ static void adverse(void) {
     assert(billiard_polygon_begin(&square,center,huge_direction,4,&ray) == BILLIARD_POLYGON_OK);
     billiard_polygon_ray saved = ray;
     assert(billiard_polygon_next(&square,&ray,&event) == BILLIARD_POLYGON_ARITHMETIC_LIMIT);
-    assert(!memcmp(&ray,&saved,sizeof ray));
+    assert(same_ray(ray,saved));
     puts("malformed geometry, exact/near corner, nearly parallel, bounded arithmetic: PASS");
 }
 
