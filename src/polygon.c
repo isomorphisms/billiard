@@ -176,6 +176,64 @@ double billiard_exact_display(exact number) {
            number.denominator;
 }
 
+int billiard_exact_valid(exact number) { return canonical(number); }
+int billiard_exact_equal(exact first, exact second) {
+    return canonical(first) && canonical(second) &&
+        first.rational == second.rational && first.radical == second.radical &&
+        first.denominator == second.denominator;
+}
+
+#define FIELD_OPERATION(name, operation) \
+int name(exact first, exact second, exact *result) { \
+    if (!result || !canonical(first) || !canonical(second)) return -1; \
+    calculation work = {0}; \
+    exact proposed = operation(&work, first, second); \
+    if (work.failed) return -1; \
+    *result = proposed; \
+    return 0; \
+}
+FIELD_OPERATION(billiard_exact_add, add)
+FIELD_OPERATION(billiard_exact_subtract, subtract)
+FIELD_OPERATION(billiard_exact_multiply, multiply)
+FIELD_OPERATION(billiard_exact_divide, divide)
+#undef FIELD_OPERATION
+
+int billiard_exact_compare(exact first, exact second, int *ordering) {
+    if (!ordering || !canonical(first) || !canonical(second)) return -1;
+    calculation work = {0};
+    exact delta = subtract(&work, first, second);
+    if (work.failed) return -1;
+    *ordering = sign(delta);
+    return 0;
+}
+
+enum billiard_polygon_status billiard_polygon_fixture(enum billiard_fixture kind,
+                                                     billiard_polygon *polygon) {
+    if (!polygon || kind < 0 || kind >= BILLIARD_FIXTURE_COUNT) return BILLIARD_POLYGON_INVALID;
+    const int32_t vertices[BILLIARD_FIXTURE_COUNT][6][2] = {
+        {{0,0},{1,0},{1,1},{0,1}}, {{0,0},{5,0},{5,3},{0,3}},
+        {{0,0},{2,0},{0,2}}, {{0,0},{2,0},{1,0}},
+        {{0,0},{2,0},{2,1},{1,1},{1,2},{0,2}}
+    };
+    billiard_polygon proposed = {0};
+    proposed.count = kind == BILLIARD_RIGHT_TRIANGLE || kind == BILLIARD_EQUILATERAL ? 3 :
+        (kind == BILLIARD_L_POLYGON ? 6 : 4);
+    for (size_t vertex = 0; vertex < proposed.count; ++vertex) {
+        proposed.vertex[vertex] = (point){integer(vertices[kind][vertex][0]), integer(vertices[kind][vertex][1])};
+        proposed.angle[vertex] = (billiard_angle){1,2};
+    }
+    if (kind == BILLIARD_RIGHT_TRIANGLE)
+        proposed.angle[1] = proposed.angle[2] = (billiard_angle){1,4};
+    if (kind == BILLIARD_EQUILATERAL) {
+        proposed.vertex[2].y = (exact){0,1,1};
+        for (size_t vertex = 0; vertex < 3; ++vertex) proposed.angle[vertex] = (billiard_angle){1,3};
+    }
+    if (kind == BILLIARD_L_POLYGON) proposed.angle[3] = (billiard_angle){3,2};
+    enum billiard_polygon_status status = billiard_polygon_validate(&proposed);
+    if (status == BILLIARD_POLYGON_OK) *polygon = proposed;
+    return status;
+}
+
 static int on_segment(calculation *work, point candidate, point start, point end) {
     point before = difference(work, candidate, start);
     point after = difference(work, candidate, end);

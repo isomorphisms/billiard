@@ -1,0 +1,6 @@
+fixture	model	copies	V	E	F	genus	area	positive_zero_orders
+unit-square	reflected_translation_cover	4	4	8	4	1	4	none
+five-by-three-rectangle	reflected_translation_cover	4	4	8	4	1	60	none
+right-isosceles-side-two	reflected_translation_cover	8	4	12	8	1	16	none
+equilateral-side-two	reflected_translation_cover	6	3	9	6	1	6sqrt(3)	none
+three-square-L	reflected_translation_cover	4	6	12	4	2	12	2
