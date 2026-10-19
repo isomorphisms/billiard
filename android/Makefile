@@ -35,12 +35,15 @@ BUILTIN := $(shell if test -x "$(ICK_CC)"; then "$(ICK_CC)" -print-file-name=inc
 GLUE := $(NDK_ROOT)/sources/android/native_app_glue
 OUTDIR := ../build/android/$(ANDROID_ABI)
 OBJECTS := $(OUTDIR)/billiard.o $(OUTDIR)/scene.o $(OUTDIR)/framebuffer.o $(OUTDIR)/activity.o $(OUTDIR)/app_glue.o
+KERNEL_SOURCES := polygon surface flow cylinders periods affine explorer
+KERNEL_OBJECTS := $(addprefix $(OUTDIR)/,$(addsuffix .o,$(KERNEL_SOURCES)))
+OBJECTS += $(KERNEL_OBJECTS)
 ifeq ($(ANDROID_ABI),armeabi-v7a)
   # ARMv7-A does not promise a hardware divide instruction. Build the exact
   # EABI helper from the already verified ICK GCC reference, using ICK's own
   # preprocessing/assembler driver. No NDK/system compiler or runtime archive.
   ICK_ARM_RUNTIME := $(ICK_SOURCE_DIR)/gcc/libgcc/config/arm/lib1funcs.S
-  OBJECTS += $(OUTDIR)/ick_uidiv.o $(OUTDIR)/ick_divzero.o
+  OBJECTS += $(OUTDIR)/ick_uidiv.o $(OUTDIR)/ick_idiv.o $(OUTDIR)/ick_divzero.o
 endif
 LIBRARY := $(OUTDIR)/libbilliard.so
 
@@ -82,9 +85,17 @@ $(OUTDIR)/app_glue.o: $(GLUE)/android_native_app_glue.c check-ick
 	@mkdir -p "$(OUTDIR)"
 	"$(ICK_CC)" $(CFLAGS_ICK) -c "$<" -o "$@"
 
+$(KERNEL_OBJECTS): $(OUTDIR)/%.o: ../src/%.c $(wildcard ../src/*.h) check-ick
+	@mkdir -p "$(OUTDIR)"
+	"$(ICK_CC)" $(CFLAGS_ICK) -c "$<" -o "$@"
+
 $(OUTDIR)/ick_uidiv.o: check-ick
 	@mkdir -p "$(OUTDIR)"
 	"$(ICK_CC)" $(TARGET_FLAGS) -fPIC -x assembler-with-cpp -DL_udivsi3 -c "$(ICK_ARM_RUNTIME)" -o "$@"
+
+$(OUTDIR)/ick_idiv.o: check-ick
+	@mkdir -p "$(OUTDIR)"
+	"$(ICK_CC)" $(TARGET_FLAGS) -fPIC -x assembler-with-cpp -DL_divsi3 -c "$(ICK_ARM_RUNTIME)" -o "$@"
 
 $(OUTDIR)/ick_divzero.o: check-ick
 	@mkdir -p "$(OUTDIR)"

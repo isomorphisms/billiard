@@ -67,6 +67,7 @@ enum billiard_fixture { BILLIARD_SQUARE, BILLIARD_RECTANGLE, BILLIARD_RIGHT_TRIA
     BILLIARD_EQUILATERAL, BILLIARD_L_POLYGON, BILLIARD_FIXTURE_COUNT };
 enum billiard_polygon_status billiard_polygon_fixture(enum billiard_fixture fixture,
                                                      billiard_polygon *polygon);
+int billiard_polygon_direction(unsigned heading_twelfths_of_pi, billiard_exact_point *direction);
 
 /* Certification currently recognizes exact directions in multiples of pi/12
  * relative to the first side, using algebra in Q(sqrt(3)). The caller must

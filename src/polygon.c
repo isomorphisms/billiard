@@ -279,6 +279,12 @@ static int heading_for(calculation *work, point edge, point first_edge) {
     return -1;
 }
 
+int billiard_polygon_direction(unsigned heading, point *direction) {
+    if (!direction || heading >= 24) return -1;
+    *direction = direction_for(heading);
+    return 0;
+}
+
 enum billiard_polygon_status billiard_polygon_validate(const billiard_polygon *polygon) {
     if (!polygon || polygon->count < 3 || polygon->count > BILLIARD_POLYGON_MAX_VERTICES)
         return BILLIARD_POLYGON_INVALID;

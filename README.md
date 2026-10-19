@@ -23,3 +23,15 @@ Start with one rectangle whose right wall can be dragged. A ray follows exact ma
 - `ai-ci`: independent acceptance of math, render output and producer receipts.
 
 The initial browser/host demonstration is not evidence of an Android build, APK installation, or physical-device acceptance.
+
+## BIL campaign implementation
+
+The bounded exact polygon kernel, checked translation covers, straight flow,
+cylinder certificates, witnessed periods/affine actions and finite orbit corpus
+are implemented in separate C modules. Native fixture tabs and truthful
+polygon/cover controls use those same modules and the pinned Rough renderer.
+See [native explorer controls and acceptance](docs/native-explorer.md),
+[bounded experiments](docs/bounded-experiments.md), and the linked mathematical
+module notes. All maintained C, including tests and Android glue, is ICK-only.
+Physical A1 and C67 acceptance remains separate from successful host/ABI/package
+checks; current per-device cases are recorded as NOT RUN.

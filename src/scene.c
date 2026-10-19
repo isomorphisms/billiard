@@ -72,10 +72,14 @@ int billiard_scene(FILE *out, unsigned screen_width, unsigned screen_height,
     billiard_segment segments[512];
     size_t count = billiard_trace(&table,distance,segments,512);
     if(count == SIZE_MAX) return -1;
-    fprintf(out,"P 30 105 172\nA .20\nW 1.15\nD 1.05 6.0\n"
-                "M %.5f %.5f\n",layout->start_x,layout->start_y);
-    for(size_t i=0;i<count;i++)
+    /* The solid low-opacity underlay survives redraws and makes the travelled
+     * path readable between dots, including on the physical phone display. */
+    for(unsigned pass=0;pass<2;pass++) {
+      fprintf(out,"P 30 105 172\nA %s\nW 1.15\nD %s\n"
+                "M %.5f %.5f\n",pass?".20":".14",pass?"1.05 6.0":"0 0",layout->start_x,layout->start_y);
+      for(size_t i=0;i<count;i++)
         fprintf(out,"L %.5f %.5f\n",left+segments[i].x1,top+segments[i].y1);
+    }
 
     /* The reflected grid is far more transparent than the physical path. */
     double ghost_scale = .31;
