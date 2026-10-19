@@ -74,3 +74,9 @@ jobs:
             build/billiard.ppm
             build/billiard.ops
           if-no-files-found: error
+      - name: Retain the qualified ICK stage for sequential campaign verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-ick-host-stage-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/ick-host-stage
+          if-no-files-found: error
