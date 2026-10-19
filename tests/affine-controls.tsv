@@ -1,0 +1,7 @@
+source	matrix	area	canonical_torus_first_period	canonical_torus_second_period	tau	positive_zero_orders
+square-cover	1,0;0,1	4	2,0	0,2	0+i	none
+square-cover	1,0.5;0,1	4	2,0	1,2	0.5+i	none
+square-cover	2,0;0,0.5	4	4,0	0,1	0+0.25i	none
+square-cover	2,0;0,3	24	4,0	0,6	0+1.5i	none
+five-by-three-rectangle-cover	1,0.5;0,1	60	10,0	3,6	0.3+0.6i	none
+L-cover	1,0.5;0,1	12	not-a-global-torus-basis	not-a-global-torus-basis	not-defined	2
