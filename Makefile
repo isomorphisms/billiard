@@ -39,3 +39,16 @@ scene: build/scene_ops
 
 clean:
 	rm -rf build
+
+# This fixed Make interface packages the already qualified compiler for local
+# campaign verification. Stripping removes debug sections, not code.
+.PHONY: export-ick-stage
+export-ick-stage: check-ick
+	mkdir -p build/ick-host-stage
+	cp -a "$(ICK_EXPORT_STAGE)/." build/ick-host-stage/
+	sha256sum build/ick-host-stage/bin/gcc build/ick-host-stage/libexec/gcc/x86_64-pc-linux-gnu/17.0.0/cc1 > build/ick-host-stage/export-original.sha256
+	strip --strip-debug build/ick-host-stage/libexec/gcc/x86_64-pc-linux-gnu/17.0.0/cc1
+	if test ! -f build/ick-host-stage/libexec/gcc/x86_64-pc-linux-gnu/17.0.0/lto1; then :; else strip --strip-debug build/ick-host-stage/libexec/gcc/x86_64-pc-linux-gnu/17.0.0/lto1; fi
+	sha256sum build/ick-host-stage/bin/gcc build/ick-host-stage/libexec/gcc/x86_64-pc-linux-gnu/17.0.0/cc1 > build/ick-host-stage/export-stripped.sha256
+	$(MAKE) test scene ICK_CC="$(abspath build/ick-host-stage/bin/gcc)"
+	tar -C build -czf "$(abspath build/ick-host-stage.tar.gz)" ick-host-stage
