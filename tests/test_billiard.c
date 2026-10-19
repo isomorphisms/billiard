@@ -1,4 +1,5 @@
 #include "billiard.h"
+#include "pixel_sample.h"
 
 #include <assert.h>
 #include <math.h>
@@ -13,6 +14,18 @@ static void near(double got, double wanted, double tolerance) {
 }
 
 int main(void) {
+    /* Independent wide-arithmetic reference for the bounded ARM32 mapping.
+     * Include both actual phones, narrow windows, and maximum allowed sizes. */
+    const uint32_t windows[] = {160, 320, 360, 576, 720, 1152, 1600, 8191, 8192};
+    const uint32_t images[] = {160, 320, 360, 640, 999, 1000};
+    for (size_t w = 0; w < sizeof windows / sizeof *windows; ++w)
+        for (size_t s = 0; s < sizeof images / sizeof *images; ++s)
+            for (uint32_t p = 0; p < windows[w]; ++p) {
+                uint32_t expected = (uint32_t)((uint64_t)p * images[s] / windows[w]);
+                assert(billiard_pixel_sample(p, images[s], windows[w]) == expected);
+                assert(expected < images[s]);
+            }
+    puts("bounded pixel samples versus uint64 reference: PASS");
     billiard_table table;
     billiard_ray ray;
     billiard_segment segment;

@@ -18,7 +18,7 @@ check-ick:
 	@test "$$("$(ICK_CC)" -dumpmachine)" = x86_64-pc-linux-gnu || { echo "BLOCKED: wrong ICK host target" >&2; exit 3; }
 	@cc1="$$("$(ICK_CC)" -print-prog-name=cc1)"; test -x "$$cc1" || { echo "BLOCKED: ICK cc1 missing" >&2; exit 3; }
 
-build/test_billiard: src/billiard.c src/billiard.h tests/test_billiard.c check-ick
+build/test_billiard: src/billiard.c src/billiard.h src/pixel_sample.h tests/test_billiard.c check-ick
 	@mkdir -p build
 	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/billiard.c tests/test_billiard.c -o $@ $(LDLIBS)
 

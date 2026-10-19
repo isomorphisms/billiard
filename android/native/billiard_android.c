@@ -15,6 +15,7 @@
 
 #include "billiard.h"
 #include "scene.h"
+#include "pixel_sample.h"
 #include "framebuffer.h"
 
 #define TAG "Billiard"
@@ -52,7 +53,7 @@ static void choose_image(unsigned w, unsigned h, unsigned *rw, unsigned *rh) {
     unsigned a = w < 360 ? w : 360;
     unsigned b = (unsigned)round((double)h * a / w);
     if(b < 320) b = 320;
-    if(b > 1000) b = 1000;
+    if(b > BILLIARD_IMAGE_LIMIT) b = BILLIARD_IMAGE_LIMIT;
     *rw=a;*rh=b;
 }
 
@@ -84,7 +85,8 @@ static void paint(state *s) {
     ANativeWindow_Buffer win;
     if(ANativeWindow_lock(s->app->window,&win,NULL)<0)return;
     if(!win.bits || win.width<160 || win.height<320 ||
-       win.width>8192 || win.height>8192 ||
+       (unsigned)win.width>BILLIARD_WINDOW_LIMIT ||
+       (unsigned)win.height>BILLIARD_WINDOW_LIMIT ||
        win.stride<win.width || win.format!=WINDOW_FORMAT_RGBA_8888) {
         ANativeWindow_unlockAndPost(s->app->window); return;
     }
@@ -125,10 +127,10 @@ static void paint(state *s) {
     }
     /* Convert straight-alpha AARRGGBB pixels to window RGBA_8888 bytes. */
     for(unsigned y=0;y<wh;y++) {
-        unsigned sy=(unsigned)((uint64_t)y*rh/wh);
+        unsigned sy=billiard_pixel_sample(y,rh,wh);
         uint8_t *row=(uint8_t*)win.bits+(size_t)y*win.stride*4;
         for(unsigned x=0;x<ww;x++) {
-            unsigned sx=(unsigned)((uint64_t)x*rw/ww);
+            unsigned sx=billiard_pixel_sample(x,rw,ww);
             uint32_t c=s->pixels[(size_t)sy*rw+sx];
             row[x*4]=(uint8_t)(c>>16);
             row[x*4+1]=(uint8_t)(c>>8);

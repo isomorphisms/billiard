@@ -67,7 +67,7 @@ $(OUTDIR)/framebuffer.o: $(ROUGH_SRC)/framebuffer.c $(ROUGH_SRC)/framebuffer.h c
 	@mkdir -p "$(OUTDIR)"
 	"$(ICK_CC)" $(CFLAGS_ICK) -c "$<" -o "$@"
 
-$(OUTDIR)/activity.o: ../android/native/billiard_android.c ../src/scene.h ../src/billiard.h $(ROUGH_SRC)/framebuffer.h check-ick
+$(OUTDIR)/activity.o: ../android/native/billiard_android.c ../src/scene.h ../src/billiard.h ../src/pixel_sample.h $(ROUGH_SRC)/framebuffer.h check-ick
 	@mkdir -p "$(OUTDIR)"
 	"$(ICK_CC)" $(CFLAGS_ICK) -c "$<" -o "$@"
 
