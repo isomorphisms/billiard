@@ -5,6 +5,10 @@ ICK_SOURCE_DIR ?=
 ICK_LINK_FLAGS ?= -fno-link-libatomic
 ICK_CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math
 LDLIBS = -lm
+EXPERIMENT_SOURCES = src/experiments.c src/cylinders.c src/flow.c src/periods.c src/affine.c src/surface.c src/polygon.c src/billiard.c
+EXPERIMENT_HEADERS = $(wildcard src/*.h)
+SOURCE_REVISION := $(shell git rev-parse HEAD)
+SOURCE_STATE := $(if $(shell git status --porcelain),working_tree,commit)
 ICK_SOURCE_SHA = c61e448251744a2f40ad743ebef1a027bdcd2f9d
 ICK_REFERENCE_SHA = 6294f1d9e7536e5ffcde09d1528c918d63abfef5
 
@@ -42,13 +46,28 @@ build/test_periods: src/periods.c src/periods.h src/affine.c src/affine.h src/su
 	@mkdir -p build
 	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc src/periods.c src/affine.c src/surface.c src/polygon.c src/billiard.c tests/test_periods.c -o $@ $(LDLIBS)
 
-test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders build/test_periods
+build/test_experiments: $(EXPERIMENT_SOURCES) $(EXPERIMENT_HEADERS) tests/test_experiments.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc $(EXPERIMENT_SOURCES) tests/test_experiments.c -o $@ $(LDLIBS)
+
+build/billiard-experiments: $(EXPERIMENT_SOURCES) $(EXPERIMENT_HEADERS) src/experiments_cli.c check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -DBILLIARD_SOURCE_REVISION=\"$(SOURCE_REVISION)\" -DBILLIARD_SOURCE_STATE=\"$(SOURCE_STATE)\" -Isrc $(EXPERIMENT_SOURCES) src/experiments_cli.c -o $@ $(LDLIBS)
+
+.PHONY: experiments
+experiments: build/billiard-experiments
+	./build/billiard-experiments > build/bil-orbit.tsv
+	sha256sum "$(ICK_CC)" "$$("$(ICK_CC)" -print-prog-name=cc1)" build/billiard-experiments build/bil-orbit.tsv > build/experiment-producer.sha256
+	printf 'source_revision\t%s\nsource_state\t%s\ncompiler_source\t%s\ncompiler_reference\t%s\n' "$(SOURCE_REVISION)" "$(SOURCE_STATE)" "$(ICK_SOURCE_SHA)" "$(ICK_REFERENCE_SHA)" > build/experiment-producer.tsv
+
+test: build/test_billiard build/test_polygon build/test_surface build/test_flow build/test_cylinders build/test_periods build/test_experiments
 	./build/test_billiard
 	./build/test_polygon
 	./build/test_surface
 	./build/test_flow
 	./build/test_cylinders
 	./build/test_periods
+	./build/test_experiments
 
 build/scene_ops: src/billiard.c src/scene.c src/scene_ops.c src/billiard.h src/scene.h check-ick
 	@mkdir -p build

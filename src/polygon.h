@@ -55,6 +55,7 @@ double billiard_exact_display(billiard_exact number);
 /* Shared bounded field operations for cover/flow modules. Return 0 on success;
  * invalid input or intermediate exhaustion returns -1 without changing output. */
 int billiard_exact_valid(billiard_exact number);
+int billiard_exact_from_binary_double(double value, billiard_exact *number);
 int billiard_exact_add(billiard_exact first, billiard_exact second, billiard_exact *result);
 int billiard_exact_subtract(billiard_exact first, billiard_exact second, billiard_exact *result);
 int billiard_exact_multiply(billiard_exact first, billiard_exact second, billiard_exact *result);

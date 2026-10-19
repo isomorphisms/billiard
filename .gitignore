@@ -3,3 +3,10 @@ build/
 *.so
 *.apk
 *.ppm
+.ick-host-source/
+.ick-android-*-source/
+_rough_framebuffer/
+_canonical_ndk/
+_test_signing/
+_aici_test_signing/
+_catfood/

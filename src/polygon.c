@@ -366,8 +366,8 @@ enum billiard_polygon_status billiard_polygon_locate(const billiard_polygon *pol
     return BILLIARD_POLYGON_OK;
 }
 
-static int from_binary_double(double value, exact *number) {
-    if (!isfinite(value)) return -1;
+int billiard_exact_from_binary_double(double value, exact *number) {
+    if (!number || !isfinite(value)) return -1;
     int32_t denominator = 1;
     while (value != trunc(value)) {
         if (denominator > INT32_MAX/2 || fabs(value) > INT32_MAX/2) return -1;
@@ -383,7 +383,7 @@ enum billiard_polygon_status billiard_polygon_rectangle(const billiard_table *ta
     if (!table || !polygon || !isfinite(table->width) || !isfinite(table->height) ||
         table->width <= 0 || table->height <= 0) return BILLIARD_POLYGON_INVALID;
     exact width, height, zero = integer(0);
-    if (from_binary_double(table->width, &width) || from_binary_double(table->height, &height))
+    if (billiard_exact_from_binary_double(table->width, &width) || billiard_exact_from_binary_double(table->height, &height))
         return BILLIARD_POLYGON_ARITHMETIC_LIMIT;
     billiard_polygon result = {0};
     result.count = 4;

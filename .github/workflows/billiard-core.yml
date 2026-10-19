@@ -35,6 +35,11 @@ jobs:
           ICK_CC: ${{ steps.ick.outputs.compiler }}
           ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
         run: make -C _rough_framebuffer clean test
+      - name: Generate the bounded orbit corpus with exact source and producer records
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
+        run: make experiments
       - name: Render the actual geometry through ICK-produced Rough executable
         shell: bash
         run: |
@@ -73,6 +78,9 @@ jobs:
           path: |
             build/billiard.ppm
             build/billiard.ops
+            build/bil-orbit.tsv
+            build/experiment-producer.tsv
+            build/experiment-producer.sha256
           if-no-files-found: error
       - name: Package and recheck the ICK stage after removing debug sections
         if: github.event_name == 'pull_request' && github.event.pull_request.number == 14
