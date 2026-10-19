@@ -51,6 +51,21 @@ int billiard_exact_make(int32_t rational, int32_t radical, int32_t denominator,
                        billiard_exact *result);
 double billiard_exact_display(billiard_exact number);
 
+/* Shared bounded field operations for cover/flow modules. Return 0 on success;
+ * invalid input or intermediate exhaustion returns -1 without changing output. */
+int billiard_exact_valid(billiard_exact number);
+int billiard_exact_add(billiard_exact first, billiard_exact second, billiard_exact *result);
+int billiard_exact_subtract(billiard_exact first, billiard_exact second, billiard_exact *result);
+int billiard_exact_multiply(billiard_exact first, billiard_exact second, billiard_exact *result);
+int billiard_exact_divide(billiard_exact first, billiard_exact second, billiard_exact *result);
+int billiard_exact_compare(billiard_exact first, billiard_exact second, int *ordering);
+int billiard_exact_equal(billiard_exact first, billiard_exact second);
+
+enum billiard_fixture { BILLIARD_SQUARE, BILLIARD_RECTANGLE, BILLIARD_RIGHT_TRIANGLE,
+    BILLIARD_EQUILATERAL, BILLIARD_L_POLYGON, BILLIARD_FIXTURE_COUNT };
+enum billiard_polygon_status billiard_polygon_fixture(enum billiard_fixture fixture,
+                                                     billiard_polygon *polygon);
+
 /* Certification currently recognizes exact directions in multiples of pi/12
  * relative to the first side, using algebra in Q(sqrt(3)). The caller must
  * supply angle claims; validation proves them from the exact vertices.
