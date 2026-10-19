@@ -1,0 +1,6 @@
+fixture	vertices_counterclockwise	angle_multiples_of_pi	start	direction	first_event	first_end	first_outgoing
+unit-square	(0,0);(1,0);(1,1);(0,1)	1/2;1/2;1/2;1/2	(1/2,1/2)	(1,1)	vertex:2:stop	(1,1)	none
+rectangle	(0,0);(5,0);(5,3);(0,3)	1/2;1/2;1/2;1/2	(5/2,1)	(1,-1)	side:0	(7/2,0)	(1,1)
+right-isosceles	(0,0);(2,0);(0,2)	1/2;1/4;1/4	(1/2,1/2)	(1,0)	side:1	(3/2,1/2)	(0,-1)
+equilateral	(0,0);(2,0);(1,sqrt(3))	1/3;1/3;1/3	(1,sqrt(3)/3)	(1,0)	side:1	(5/3,sqrt(3)/3)	(-1/2,-sqrt(3)/2)
+three-square-L	(0,0);(2,0);(2,1);(1,1);(1,2);(0,2)	1/2;1/2;1/2;3/2;1/2;1/2	(1/2,3/2)	(1,0)	side:3	(1,3/2)	(-1,0)

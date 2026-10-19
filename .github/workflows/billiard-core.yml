@@ -74,3 +74,15 @@ jobs:
             build/billiard.ppm
             build/billiard.ops
           if-no-files-found: error
+      - name: Package and recheck the ICK stage after removing debug sections
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
+          ICK_EXPORT_STAGE: ${{ runner.temp }}/ick-host-stage
+        run: make export-ick-stage
+      - name: Retain the qualified ICK stage for sequential campaign verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: billiard-ick-host-stage-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/ick-host-stage.tar.gz
+          if-no-files-found: error
